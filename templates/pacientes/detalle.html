@@ -21,7 +21,7 @@
 
 {% if 'consultas.crear' in permisos %}
 <div class="collapse mb-3" id="nueva-consulta">
-  <form method="post" action="{% url 'clinica:consulta_nueva' paciente.pk %}" class="card card-body" style="max-width:820px">{% csrf_token %}
+  <form method="get" action="{% url 'clinica:consulta_nueva' paciente.pk %}" class="card card-body" style="max-width:820px">
     <div class="row g-2 align-items-end">
       <div class="col-md-4"><label class="form-label small">Plantilla</label><select name="plantilla" class="form-select">
         {% for pl in plantillas_consulta %}<option value="{{ pl.pk }}" {% if pl.pk == plantilla_sugerida.pk %}selected{% endif %}>{{ pl.nombre }}{% if pl.profesional %} (mía){% endif %}</option>{% endfor %}</select></div>

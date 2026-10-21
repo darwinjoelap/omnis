@@ -139,14 +139,20 @@ def atender(cita, perfil):
     consulta = abrir_consulta(paciente=cita.paciente, profesional=perfil,
                               plantilla=tipo.plantilla if tipo and tipo.plantilla_id and tipo.plantilla.activa else None,
                               tipo=tipo.tipo_consulta if tipo else 'PRIMERA', lugar=cita.lugar)
+    vincular_consulta(cita, consulta, perfil)
+    return consulta
+
+
+def vincular_consulta(cita, consulta, perfil):
+    """Marca la cita atendida con esa consulta y genera el cargo del servicio del tipo de cita (una sola vez)."""
     cita.consulta = consulta
     cita.estado = Cita.Estado.ATENDIDA
     cita.save(update_fields=['consulta', 'estado', 'actualizado_en'])
+    tipo = cita.tipo
     if tipo and tipo.servicio_id and tipo.servicio.activo and not cita.cargos.exists():
         from apps.cobros.servicios import crear_cargo
         crear_cargo(paciente=cita.paciente, servicio=tipo.servicio, descripcion=tipo.servicio.nombre,
                     precio_usd=tipo.servicio.precio_usd, consulta=consulta, cita=cita, profesional=perfil)
-    return consulta
 
 
 def turnos_libres(profesional, fecha):

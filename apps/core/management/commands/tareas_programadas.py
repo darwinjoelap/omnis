@@ -23,7 +23,8 @@ class Command(BaseCommand):
             from django.contrib.sessions.models import Session
             n, _ = Session.objects.filter(expire_date__lt=timezone.now() - timedelta(days=1)).delete()
             self.stdout.write(f'Sesiones vencidas eliminadas: {n}')
+            from apps.offline.middleware import limpiar_viejas
+            self.stdout.write(f'Envíos sin conexión antiguos eliminados: {limpiar_viejas()}')
         if solo in (None, 'consultas'):
             from apps.clinica.consultas import cerrar_vencidas
             self.stdout.write(f'Consultas cerradas automáticamente: {cerrar_vencidas()}')
-        # TODO(FASE 12): limpiar SolicitudIdempotente de más de 7 días

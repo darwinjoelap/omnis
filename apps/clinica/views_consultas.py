@@ -41,23 +41,84 @@ def _formularios(consulta, data=None):
     return formularios
 
 
+def _inicio(texto):
+    """Hora en que el médico abrió el formulario (la manda el navegador); se acepta si es de las últimas 72 h."""
+    from datetime import datetime, timedelta
+
+    from django.utils import timezone
+    try:
+        momento = datetime.fromisoformat((texto or '').replace('Z', '+00:00'))
+    except ValueError:
+        return None
+    if timezone.is_naive(momento):
+        momento = timezone.make_aware(momento)
+    ahora = timezone.now()
+    return momento if ahora - timedelta(hours=72) <= momento <= ahora + timedelta(minutes=10) else None
+
+
 @login_required
 @requiere('consultas.crear')
-@require_POST
 def nueva(request, paciente_pk):
-    paciente = get_object_or_404(Paciente.objects.all(), pk=paciente_pk)
+    """
+    GET: formulario completo de una consulta nueva (aún no existe; se puede llenar sin conexión).
+    POST con `completa`: crea la consulta con todo lo llenado. POST sin `completa` (compatibilidad):
+    abre la consulta en curso y lleva a editarla.
+    """
+    from apps.agenda.models import Cita
     from apps.pacientes.selectors import puede_ver_paciente
+    paciente = get_object_or_404(Paciente.objects.all(), pk=paciente_pk)
     if not puede_ver_paciente(request.membresia, paciente):
         raise PermissionDenied
     perfil = request.membresia.perfil_activo
+    datos = request.POST if request.method == 'POST' else request.GET
+    cita = None
+    if (datos.get('cita') or '').isdigit():
+        cita = Cita.objects.select_related('tipo__plantilla', 'lugar').filter(
+            pk=datos['cita'], paciente=paciente, profesional=perfil).first()
     plantilla = None
-    if request.POST.get('plantilla'):
-        plantilla = get_object_or_404(PlantillaHistoria.objects.filter(activa=True), pk=request.POST['plantilla'])
-    lugar = Lugar.objects.filter(pk=request.POST.get('lugar') or 0).first()
-    tipo = request.POST.get('tipo') if request.POST.get('tipo') in Consulta.Tipo.values else Consulta.Tipo.PRIMERA
-    consulta = srv.abrir_consulta(paciente=paciente, profesional=perfil, plantilla=plantilla, tipo=tipo, lugar=lugar)
-    auditoria.registrar(request, 'CREAR', consulta, paciente_id=paciente.pk)
-    return redirect('clinica:consulta_editar', pk=consulta.pk)
+    if (datos.get('plantilla') or '').isdigit():
+        plantilla = get_object_or_404(PlantillaHistoria.objects.filter(activa=True), pk=datos['plantilla'])
+    elif cita is not None and cita.tipo_id and cita.tipo.plantilla_id and cita.tipo.plantilla.activa:
+        plantilla = cita.tipo.plantilla
+    lugar = Lugar.objects.filter(pk=datos.get('lugar') or 0).first() or (cita.lugar if cita else None)
+    tipo = datos.get('tipo') if datos.get('tipo') in Consulta.Tipo.values else (
+        cita.tipo.tipo_consulta if cita is not None and cita.tipo_id else Consulta.Tipo.PRIMERA)
+
+    if request.method == 'POST' and not request.POST.get('completa'):
+        consulta = srv.abrir_consulta(paciente=paciente, profesional=perfil, plantilla=plantilla, tipo=tipo,
+                                      lugar=lugar)
+        auditoria.registrar(request, 'CREAR', consulta, paciente_id=paciente.pk)
+        return redirect('clinica:consulta_editar', pk=consulta.pk)
+    if request.method == 'GET' and cita is not None and cita.consulta_id:
+        messages.info(request, 'Esta cita ya se atendió.')
+        return redirect('clinica:consulta', pk=cita.consulta_id)
+
+    consulta = srv.consulta_nueva(paciente=paciente, profesional=perfil, plantilla=plantilla, tipo=tipo, lugar=lugar)
+    formularios = _formularios(consulta, request.POST if request.method == 'POST' else None)
+    if request.method == 'POST':
+        if all(f.is_valid() for _, f in formularios):
+            accion = request.POST.get('accion')
+            if cita is not None and cita.consulta_id:
+                messages.warning(request, 'La cita ya tenía una consulta: esta se guardó aparte.')
+            creada = srv.crear_consulta_completa(
+                paciente=paciente, profesional=perfil, plantilla=consulta.plantilla, tipo=tipo, lugar=lugar,
+                datos_por_seccion={item['seccion_id']: f.datos_limpios for item, f in formularios}, cita=cita,
+                fecha_hora=_inicio(request.POST.get('inicio')), cerrar=accion == 'cerrar', usuario=request.user)
+            auditoria.registrar(request, 'CREAR', creada, paciente_id=paciente.pk)
+            if creada.estado == Consulta.Estado.CERRADA:
+                messages.success(request, 'Consulta guardada y cerrada.')
+                return redirect('clinica:consulta', pk=creada.pk)
+            if accion == 'cerrar':
+                messages.warning(request, 'Guardada, pero no se cerró. Falta: ' + ', '.join(srv.faltantes(creada)))
+            else:
+                messages.success(request, 'Consulta guardada.')
+            return redirect('clinica:consulta_editar', pk=creada.pk)
+        messages.error(request, 'Revisa los campos marcados en rojo; no se guardó nada.')
+    from .selectors import consultas_visibles
+    return render(request, 'clinica/consulta_form.html', {
+        'titulo': f'Nueva consulta · {paciente}', 'consulta': consulta, 'formularios': formularios, 'nueva': True,
+        'cita': cita, 'previas': consultas_visibles(request, paciente)[:5],
+        'antecedentes': getattr(paciente, 'antecedentes', None), 'faltan': []})
 
 
 @login_required

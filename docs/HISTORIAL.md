@@ -16,6 +16,11 @@
 
 ---
 
+### Fase 12 — PWA offline de consulta (2026-10-20)
+- Hecho: app `offline` (idempotencia, ping, precarga), `offline.js` portado de Pediae (borradores, cola, píldora), service worker con copias de páginas y página «sin conexión» que lista lo guardado; consulta nueva en un solo envío (GET formulario / POST completa) que vincula la cita y genera el cargo; «Atender» sin red → consulta nueva guardada.
+- Verificado: 118 tests (SQLite + PostgreSQL), ruff limpio, E2E con servidor apagado (copia, cola, sincronización).
+- ADR: 032.
+
 ### Fase 11 + perfil Pediae (2026-10-20)
 - Hecho: app `reportes` (tablero, PDF, Excel), perfil profesional con logo/marca de agua/banner, firma y sello fijos al pie de los PDF, documento de muestra por médico.
 - Verificado: 107 tests (SQLite + PostgreSQL), ruff limpio, capturas escritorio/móvil y PDF revisados.

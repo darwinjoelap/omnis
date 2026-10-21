@@ -137,6 +137,10 @@
 
   <script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}"></script>
   <script src="{% static 'js/pwa.js' %}" defer></script>
+  {% if user.is_authenticated and tenant and membresia and not membresia.soporte %}
+  <script>window.OFFLINE_CFG = {app: 'omnis', tenant: '{{ tenant.slug|escapejs }}', user: '{{ user.pk }}', loginUrl: '{% url 'usuarios:login' %}'};</script>
+  <script src="{% static 'js/offline.js' %}" defer></script>
+  {% endif %}
   <script src="{% static 'vendor/htmx/htmx.min.js' %}"></script>
   <script>
     document.body.addEventListener('htmx:configRequest', function (e) {

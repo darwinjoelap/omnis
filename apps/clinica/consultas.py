@@ -1,6 +1,7 @@
 """
 Servicios de la consulta clínica (Fase 07). Toda escritura de una consulta pasa por aquí.
 """
+import contextlib
 from datetime import timedelta
 from decimal import Decimal
 
@@ -92,6 +93,37 @@ def abrir_consulta(*, paciente, profesional, plantilla=None, tipo=Consulta.Tipo.
         lugar=lugar, estructura=congelar_estructura(plantilla), fecha_hora=fecha_hora or timezone.now(), tipo=tipo)
 
 
+def consulta_nueva(*, paciente, profesional, plantilla=None, tipo=Consulta.Tipo.PRIMERA, lugar=None):
+    """Consulta SIN guardar, con la estructura de la plantilla: para mostrar el formulario completo antes de
+    crearla (así se puede llenar sin conexión y se crea al enviarse)."""
+    plantilla = plantilla or plantilla_para(profesional)
+    if plantilla is None:
+        raise ErrorDeNegocio('No hay plantillas de historia para tu especialidad. Crea una en «Plantillas».')
+    return Consulta(paciente=paciente, profesional=profesional, especialidad=profesional.especialidad,
+                    plantilla=plantilla, lugar=lugar, estructura=congelar_estructura(plantilla),
+                    fecha_hora=timezone.now(), tipo=tipo, tenant=paciente.tenant)
+
+
+@transaction.atomic
+def crear_consulta_completa(*, paciente, profesional, plantilla, tipo, lugar, datos_por_seccion, cita=None,
+                            fecha_hora=None, cerrar=False, usuario=None):
+    """
+    Crea la consulta y guarda sus secciones en un solo paso (envío del formulario completo, quizá desde la cola
+    sin conexión: `fecha_hora` es la hora en que el médico abrió el formulario). Con cita, la marca atendida.
+    """
+    consulta = abrir_consulta(paciente=paciente, profesional=profesional, plantilla=plantilla, tipo=tipo,
+                              lugar=lugar, fecha_hora=fecha_hora)
+    guardar_secciones(consulta, datos_por_seccion)
+    if cita is not None and cita.profesional_id == profesional.pk and not cita.consulta_id:
+        from apps.agenda.servicios import vincular_consulta
+        vincular_consulta(cita, consulta, profesional)
+    if cerrar:
+        with contextlib.suppress(ErrorDeNegocio):     # si falta algo queda en curso; la vista avisa qué falta
+            cerrar_consulta(consulta, usuario)
+    consulta.refresh_from_db()
+    return consulta
+
+
 # ── Leer ──────────────────────────────────────────────────────────────────────
 
 def contexto_calculo(consulta):
@@ -102,7 +134,7 @@ def contexto_calculo(consulta):
 
 def datos_guardados(consulta):
     """{seccion_id: datos} de la consulta + secciones del paciente vigentes + antecedentes base."""
-    datos = {r.seccion_id: r.datos for r in consulta.registros.all()}
+    datos = {r.seccion_id: r.datos for r in consulta.registros.all()} if consulta.pk else {}
     pendientes = [i for i in consulta.estructura if i['ambito'] == 'PACIENTE' and i['seccion_id'] not in datos]
     if pendientes:
         vigentes = {r.seccion_id: r.datos for r in RegistroSeccionPaciente.objects.filter(

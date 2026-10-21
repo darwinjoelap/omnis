@@ -44,6 +44,7 @@ OMNIS_APPS = [
     'apps.clinica',
     'apps.documentos',
     'apps.reportes',
+    'apps.offline',
     # Especialidades (módulos enchufables): agregar aquí + `sincronizar_especialidades`
     'apps.especialidades.general',
 ]
@@ -63,6 +64,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'apps.core.middleware.ErrorDeNegocioMiddleware',
+    'apps.offline.middleware.IdempotenciaMiddleware',   # al final: necesita usuario y mensajes
 ]
 
 ROOT_URLCONF = 'config.urls'
