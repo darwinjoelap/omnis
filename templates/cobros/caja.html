@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block contenido %}
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+  <h1 class="h3 mb-0 me-auto">Caja del {{ fecha|date:"d/m/Y" }}</h1>
+  <form class="d-flex gap-2"><input type="date" name="fecha" value="{{ fecha|date:'Y-m-d' }}" class="form-control form-control-sm" onchange="this.form.submit()"></form>
+</div>
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-3"><div class="card card-body"><div class="small text-muted">Cobrado (USD equiv.)</div><div class="h4 mb-0">{{ total_usd|usd }}</div></div></div>
+  <div class="col-6 col-md-3"><div class="card card-body"><div class="small text-muted">Facturado del día</div><div class="h4 mb-0">{{ cargos_usd|usd }}</div></div></div>
+</div>
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="card"><div class="card-header bg-white fw-semibold">Por método</div>
+      <ul class="list-group list-group-flush">{% for r in resumen %}
+        <li class="list-group-item d-flex justify-content-between"><span>{{ r.metodo }} <span class="text-muted small">({{ r.n }})</span></span>
+          <span class="text-end">{% if r.moneda == 'BS' %}{{ r.monto|bs }}<div class="small text-muted">≈ {{ r.usd|usd }}</div>{% else %}{{ r.monto|usd }}{% endif %}</span></li>
+      {% empty %}<li class="list-group-item text-muted">Sin pagos este día.</li>{% endfor %}</ul></div>
+  </div>
+  <div class="col-lg-8">
+    <div class="card"><div class="table-responsive"><table class="table align-middle mb-0 om-tabla">
+      <thead class="table-light"><tr><th>Paciente</th><th>Método</th><th class="text-end">Monto</th><th>Registró</th></tr></thead>
+      <tbody>{% for p in pagos %}
+        <tr onclick="location.href='{% url 'cobros:cuenta' p.paciente_id %}'" role="button">
+          <td data-label="Paciente">{{ p.paciente }}</td>
+          <td data-label="Método">{{ p.get_metodo_display }}{% if p.referencia %} · {{ p.referencia }}{% endif %}</td>
+          <td data-label="Monto" class="text-end">{% if p.moneda == 'BS' %}{{ p.monto|bs }}{% else %}{{ p.monto|usd }}{% endif %}</td>
+          <td data-label="Registró" class="small text-muted">{{ p.creado_por.get_full_name|default:p.creado_por|default:"—" }}</td>
+        </tr>
+      {% empty %}<tr><td colspan="4" class="text-center text-muted py-4">Sin pagos este día.</td></tr>{% endfor %}</tbody>
+    </table></div></div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,354 @@
+"""
+Servicios de la consulta clínica (Fase 07). Toda escritura de una consulta pasa por aquí.
+"""
+from datetime import timedelta
+from decimal import Decimal
+
+from django.db import transaction
+from django.utils import timezone
+
+from apps.core.excepciones import ErrorDeNegocio
+from apps.core.fechas import edad_meses
+from apps.pacientes.models import AntecedenteBase
+
+from . import esquemas, registro
+from .models import (
+    Cie10,
+    Consulta,
+    DiagnosticoConsulta,
+    Enmienda,
+    ItemPrescripcion,
+    PlantillaHistoria,
+    RegistroSeccion,
+    RegistroSeccionPaciente,
+    SeccionClinica,
+    SignosVitales,
+)
+
+ANTECEDENTES = 'nucleo.antecedentes'
+CAMPOS_ANTECEDENTES = ['alergias', 'medicacion_actual', 'enfermedades_cronicas', 'cirugias', 'hospitalizaciones',
+                       'transfusiones', 'habitos', 'antecedentes_familiares', 'otros']
+
+
+# ── Permisos sobre una consulta ───────────────────────────────────────────────
+
+def puede_ver(membresia, consulta):
+    """Visibilidad configurable por consultorio (ADR-008)."""
+    perfil = membresia.perfil_activo if membresia else None
+    if perfil is None:
+        return False
+    if consulta.profesional_id == perfil.pk:
+        return True
+    modo = consulta.tenant.configuracion.visibilidad_historia
+    if modo == 'COMPARTIDA':
+        return True
+    if modo == 'POR_ESPECIALIDAD':
+        return consulta.especialidad_id == perfil.especialidad_id
+    return False
+
+
+def puede_editar(membresia, consulta):
+    perfil = membresia.perfil_activo if membresia else None
+    return perfil is not None and consulta.profesional_id == perfil.pk and consulta.editable
+
+
+# ── Abrir ─────────────────────────────────────────────────────────────────────
+
+def plantilla_para(profesional, especialidad=None):
+    """La predeterminada propia del profesional; si no tiene, la predeterminada de la clínica."""
+    especialidad = especialidad or profesional.especialidad
+    qs = PlantillaHistoria.objects.filter(especialidad=especialidad, activa=True)
+    return (qs.filter(profesional=profesional, es_predeterminada=True).first()
+            or qs.filter(profesional__isnull=True, es_predeterminada=True).first()
+            or qs.filter(profesional__isnull=True).first())
+
+
+def congelar_estructura(plantilla):
+    estructura = []
+    for item in plantilla.items.select_related('seccion').order_by('orden', 'id'):
+        s = item.seccion
+        if not s.activa:
+            continue
+        estructura.append({
+            'seccion_id': s.pk, 'codigo': s.codigo, 'nombre': s.nombre, 'version': s.version, 'ambito': s.ambito,
+            'obligatoria': item.obligatoria, 'colapsada': item.colapsada,
+            'campos': esquemas.campos_efectivos(s.esquema, item.ajustes),
+        })
+    return estructura
+
+
+@transaction.atomic
+def abrir_consulta(*, paciente, profesional, plantilla=None, tipo=Consulta.Tipo.PRIMERA, lugar=None,
+                   fecha_hora=None):
+    plantilla = plantilla or plantilla_para(profesional)
+    if plantilla is None:
+        raise ErrorDeNegocio('No hay plantillas de historia para tu especialidad. Crea una en «Plantillas».')
+    if plantilla.profesional_id not in (None, profesional.pk):
+        raise ErrorDeNegocio('Esa plantilla es de otro profesional.')
+    if not paciente.activo:
+        raise ErrorDeNegocio('El paciente está inactivo.')
+    return Consulta.objects.create(
+        paciente=paciente, profesional=profesional, especialidad=profesional.especialidad, plantilla=plantilla,
+        lugar=lugar, estructura=congelar_estructura(plantilla), fecha_hora=fecha_hora or timezone.now(), tipo=tipo)
+
+
+# ── Leer ──────────────────────────────────────────────────────────────────────
+
+def contexto_calculo(consulta):
+    p = consulta.paciente
+    return {'paciente': p, 'sexo': p.sexo, 'fecha': timezone.localtime(consulta.fecha_hora).date(),
+            'edad_meses': edad_meses(p.fecha_nacimiento, timezone.localtime(consulta.fecha_hora).date())}
+
+
+def datos_guardados(consulta):
+    """{seccion_id: datos} de la consulta + secciones del paciente vigentes + antecedentes base."""
+    datos = {r.seccion_id: r.datos for r in consulta.registros.all()}
+    pendientes = [i for i in consulta.estructura if i['ambito'] == 'PACIENTE' and i['seccion_id'] not in datos]
+    if pendientes:
+        vigentes = {r.seccion_id: r.datos for r in RegistroSeccionPaciente.objects.filter(
+            paciente=consulta.paciente, vigente=True, seccion_id__in=[i['seccion_id'] for i in pendientes])}
+        for item in pendientes:
+            if item['codigo'] == ANTECEDENTES:
+                base = AntecedenteBase.objects.filter(paciente=consulta.paciente).first()
+                datos[item['seccion_id']] = ({c: getattr(base, c) for c in CAMPOS_ANTECEDENTES if getattr(base, c)}
+                                             if base else {})
+            else:
+                datos[item['seccion_id']] = vigentes.get(item['seccion_id'], {})
+    return datos
+
+
+def lectura(consulta):
+    """Secciones con sus valores legibles (pantalla, PDF): [(item, [(campo, texto)])] sin vacías."""
+    datos = datos_guardados(consulta)
+    salida = []
+    for item in consulta.estructura:
+        valores = datos.get(item['seccion_id']) or {}
+        filas = []
+        for c in item['campos']:
+            if c['tipo'] in esquemas.TIPOS_SIN_DATO:
+                continue
+            texto = esquemas.texto_valor(c, valores.get(c['clave']))
+            if texto:
+                filas.append((c, texto))
+        if filas:
+            salida.append((item, filas))
+    return salida
+
+
+# ── Guardar ───────────────────────────────────────────────────────────────────
+
+def _sin_vacios(datos):
+    return {k: v for k, v in (datos or {}).items() if v not in (None, '', [], {})}
+
+
+def _guardar_paciente(consulta, item, datos):
+    paciente = consulta.paciente
+    if item['codigo'] == ANTECEDENTES:
+        base, _ = AntecedenteBase.objects.get_or_create(paciente=paciente)
+        cambios = [c for c in CAMPOS_ANTECEDENTES if (datos.get(c) or '') != getattr(base, c)]
+        for c in cambios:
+            setattr(base, c, datos.get(c) or '')
+        if cambios:
+            base.save()
+        return
+    actual = RegistroSeccionPaciente.objects.filter(paciente=paciente, seccion_id=item['seccion_id'],
+                                                    vigente=True).first()
+    if actual is not None and actual.datos == datos:
+        return
+    if actual is not None:
+        actual.vigente = False
+        actual.save(update_fields=['vigente', 'actualizado_en'])
+    if datos:
+        RegistroSeccionPaciente.objects.create(paciente=paciente, seccion_id=item['seccion_id'],
+                                               version_seccion=item['version'], datos=datos, consulta=consulta)
+
+
+def _guardar(consulta, item, datos):
+    datos = _sin_vacios(datos)
+    completar = registro.preparar(item['codigo'])
+    if completar is not None:
+        datos = completar(consulta, datos)
+    if item['ambito'] == 'PACIENTE':
+        _guardar_paciente(consulta, item, datos)
+        # también queda una copia en la consulta: así se sabe cómo estaban los antecedentes ese día
+    RegistroSeccion.objects.update_or_create(
+        consulta=consulta, seccion_id=item['seccion_id'],
+        defaults={'datos': datos, 'version_seccion': item['version'], 'tenant': consulta.tenant})
+    funcion = registro.al_guardar(item['codigo'])
+    if funcion is not None:
+        funcion(consulta, datos)
+
+
+@transaction.atomic
+def guardar_secciones(consulta, datos_por_seccion):
+    """datos_por_seccion: {seccion_id: datos_limpios}. Solo en consultas en curso."""
+    consulta = Consulta.objects.select_for_update().get(pk=consulta.pk)
+    if not consulta.editable:
+        raise ErrorDeNegocio('La consulta está cerrada: para corregirla registra una enmienda.')
+    for item in consulta.estructura:
+        if item['seccion_id'] in datos_por_seccion:
+            _guardar(consulta, item, datos_por_seccion[item['seccion_id']])
+    consulta.save(update_fields=['actualizado_en'])
+    return consulta
+
+
+def faltantes(consulta):
+    """Secciones obligatorias vacías y campos obligatorios sin llenar (impiden cerrar)."""
+    datos = datos_guardados(consulta)
+    salida = []
+    for i in consulta.estructura:
+        valores = _sin_vacios(datos.get(i['seccion_id']))
+        if i['obligatoria'] and not valores:
+            salida.append(i['nombre'])
+            continue
+        campos = esquemas.requeridos_vacios(i['campos'], valores)
+        if campos:
+            salida.append(f'{i["nombre"]} ({", ".join(campos)})')
+    return salida
+
+
+@transaction.atomic
+def cerrar_consulta(consulta, usuario=None, *, automatico=False):
+    consulta = Consulta.objects.select_for_update().get(pk=consulta.pk)
+    if not consulta.editable:
+        raise ErrorDeNegocio('La consulta ya está cerrada o anulada.')
+    pendientes = faltantes(consulta)
+    if pendientes:
+        raise ErrorDeNegocio('Para cerrar la consulta completa: ' + ', '.join(pendientes) + '.')
+    consulta.estado = Consulta.Estado.CERRADA
+    consulta.cerrada_en = timezone.now()
+    consulta.cerrada_por = None if automatico else usuario
+    consulta.save(update_fields=['estado', 'cerrada_en', 'cerrada_por', 'actualizado_en'])
+    return consulta
+
+
+@transaction.atomic
+def anular_consulta(consulta, motivo):
+    motivo = (motivo or '').strip()
+    if len(motivo) < 5:
+        raise ErrorDeNegocio('Indica el motivo de la anulación.')
+    if consulta.estado == Consulta.Estado.ANULADA:
+        raise ErrorDeNegocio('La consulta ya está anulada.')
+    consulta.estado = Consulta.Estado.ANULADA
+    consulta.motivo_anulacion = motivo[:250]
+    consulta.save(update_fields=['estado', 'motivo_anulacion', 'actualizado_en'])
+    return consulta
+
+
+@transaction.atomic
+def enmendar(consulta, seccion_id, datos, motivo):
+    """Corrige una sección de una consulta cerrada guardando el antes y el después."""
+    motivo = (motivo or '').strip()
+    if len(motivo) < 5:
+        raise ErrorDeNegocio('Indica el motivo de la enmienda.')
+    if consulta.estado != Consulta.Estado.CERRADA:
+        raise ErrorDeNegocio('Solo se enmiendan consultas cerradas; las que están en curso se editan.')
+    item = next((i for i in consulta.estructura if i['seccion_id'] == seccion_id), None)
+    if item is None:
+        raise ErrorDeNegocio('Esa sección no es parte de la consulta.')
+    antes = datos_guardados(consulta).get(seccion_id, {})
+    despues = _sin_vacios(datos)
+    if antes == despues:
+        raise ErrorDeNegocio('No hay cambios que registrar.')
+    Enmienda.objects.create(consulta=consulta, seccion_id=seccion_id, motivo=motivo[:300], antes=antes,
+                            despues=despues)
+    _guardar(consulta, item, despues)
+    return consulta
+
+
+def cerrar_vencidas(ahora=None):
+    """Cron: cierra las consultas en curso pasado el plazo de edición del consultorio (si están completas)."""
+    from apps.core.tenancy import usando_tenant
+    from apps.plataforma.models import Tenant
+    ahora = ahora or timezone.now()
+    cerradas = 0
+    for tenant in Tenant.objects.select_related('configuracion'):
+        limite = ahora - timedelta(hours=tenant.configuracion.horas_edicion_consulta)
+        with usando_tenant(tenant):
+            for consulta in Consulta.objects.filter(estado=Consulta.Estado.BORRADOR, fecha_hora__lt=limite):
+                if not faltantes(consulta):
+                    cerrar_consulta(consulta, automatico=True)
+                    cerradas += 1
+    return cerradas
+
+
+# ── Copia a tablas (núcleo) ───────────────────────────────────────────────────
+
+def _decimal(valor):
+    return None if valor in (None, '') else Decimal(str(valor))
+
+
+def _entero(valor):
+    return None if valor in (None, '') else int(round(float(valor)))
+
+
+def sincronizar_signos(consulta, datos):
+    if not datos:
+        SignosVitales.objects.filter(consulta=consulta).delete()
+        return
+    SignosVitales.objects.update_or_create(consulta=consulta, defaults={
+        'tenant': consulta.tenant, 'paciente': consulta.paciente,
+        'fecha': timezone.localtime(consulta.fecha_hora).date(),
+        'peso_kg': _decimal(datos.get('peso_kg')), 'talla_cm': _decimal(datos.get('talla_cm')),
+        'imc': _decimal(datos.get('imc')), 'pa_sistolica': _entero(datos.get('pa_sistolica')),
+        'pa_diastolica': _entero(datos.get('pa_diastolica')), 'fc': _entero(datos.get('fc')),
+        'fr': _entero(datos.get('fr')), 'temperatura': _decimal(datos.get('temperatura')),
+        'spo2': _entero(datos.get('spo2')), 'glicemia': _entero(datos.get('glicemia')),
+        'perimetro_abdominal': _decimal(datos.get('perimetro_abdominal'))})
+
+
+def completar_diagnosticos(consulta, datos):
+    """Códigos en mayúsculas y descripción del catálogo CIE-10 si el médico solo puso el código."""
+    filas = datos.get('diagnosticos') or []
+    codigos = {(f.get('codigo') or '').strip().upper() for f in filas if f.get('codigo')}
+    catalogo = {c.codigo: c.descripcion for c in Cie10.objects.filter(codigo__in=codigos)}
+    for f in filas:
+        if f.get('codigo'):
+            f['codigo'] = f['codigo'].strip().upper()
+            if not f.get('descripcion') and f['codigo'] in catalogo:
+                f['descripcion'] = catalogo[f['codigo']]
+    return datos
+
+
+def sincronizar_diagnosticos(consulta, datos):
+    DiagnosticoConsulta.objects.filter(consulta=consulta).delete()
+    filas = datos.get('diagnosticos') or []
+    codigos = {(f.get('codigo') or '').strip().upper() for f in filas if f.get('codigo')}
+    catalogo = {c.codigo: c for c in Cie10.objects.filter(codigo__in=codigos)}
+    for n, f in enumerate(filas):
+        codigo = (f.get('codigo') or '').strip().upper()
+        cie = catalogo.get(codigo)
+        descripcion = (f.get('descripcion') or (cie.descripcion if cie else '')).strip()
+        if not descripcion:
+            continue
+        DiagnosticoConsulta.objects.create(consulta=consulta, paciente=consulta.paciente, cie10=cie, codigo=codigo,
+                                           descripcion=descripcion[:300], certeza=f.get('certeza') or '', orden=n)
+    primero = DiagnosticoConsulta.objects.filter(consulta=consulta).order_by('orden').first()
+    consulta.diagnostico = str(primero)[:300] if primero else ''
+    consulta.save(update_fields=['diagnostico'])
+
+
+def sincronizar_prescripcion(consulta, datos):
+    ItemPrescripcion.objects.filter(consulta=consulta).delete()
+    for n, f in enumerate(datos.get('medicamentos') or []):
+        if f.get('medicamento'):
+            ItemPrescripcion.objects.create(
+                consulta=consulta, paciente=consulta.paciente, medicamento=f['medicamento'][:200], orden=n,
+                **{c: (f.get(c) or '')[:100] for c in ('dosis', 'frecuencia', 'duracion')},
+                cantidad=(f.get('cantidad') or '')[:60])
+
+
+def sincronizar_motivo(consulta, datos):
+    consulta.motivo = (datos.get('motivo') or '')[:300]
+    consulta.save(update_fields=['motivo'])
+
+
+registro.registrar_al_guardar('nucleo.signos_vitales', sincronizar_signos)
+registro.registrar_preparar('nucleo.diagnosticos', completar_diagnosticos)
+registro.registrar_al_guardar('nucleo.diagnosticos', sincronizar_diagnosticos)
+registro.registrar_al_guardar('nucleo.prescripcion', sincronizar_prescripcion)
+registro.registrar_al_guardar('nucleo.motivo', sincronizar_motivo)
+
+
+def seccion(seccion_id):
+    return SeccionClinica.objects.visibles().get(pk=seccion_id)

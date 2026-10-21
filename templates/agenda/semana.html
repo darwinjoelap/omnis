@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% block contenido %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+  <div class="d-flex align-items-center gap-2">
+    <a href="?fecha={{ anterior|date:'Y-m-d' }}{% if elegido %}&p={{ elegido.pk }}{% else %}&p=todos{% endif %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-chevron-left"></i></a>
+    <h1 class="h5 mb-0">Semana del {{ dias.0.0|date:"j \d\e F" }}</h1>
+    <a href="?fecha={{ siguiente|date:'Y-m-d' }}{% if elegido %}&p={{ elegido.pk }}{% else %}&p=todos{% endif %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-chevron-right"></i></a>
+  </div>
+  <a href="{% url 'agenda:dia' %}?fecha={{ fecha|date:'Y-m-d' }}{% if elegido %}&p={{ elegido.pk }}{% else %}&p=todos{% endif %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-calendar-day me-1"></i>Día</a>
+</div>
+<div class="mb-3">{% include 'agenda/_selector_profesional.html' %}</div>
+<div class="row row-cols-1 row-cols-md-2 row-cols-xl-4 g-2">
+  {% for d, citas in dias %}
+  <div class="col"><div class="card h-100 {% if d == hoy %}border-primary{% endif %}">
+    <a href="{% url 'agenda:dia' %}?fecha={{ d|date:'Y-m-d' }}{% if elegido %}&p={{ elegido.pk }}{% else %}&p=todos{% endif %}" class="card-header bg-white fw-semibold text-decoration-none d-flex justify-content-between">{{ d|date:"l j"|capfirst }}<span class="small text-muted fw-normal">{{ citas|length }}</span></a>
+    <div class="list-group list-group-flush small">
+      {% for c in citas %}<a href="{% url 'agenda:cita' c.pk %}" class="list-group-item list-group-item-action py-1 {% if not c.activa and c.estado != 'ATENDIDA' %}text-muted text-decoration-line-through{% endif %}" style="border-left:3px solid {{ c.profesional.color_agenda }}">{% if c.hora_inicio %}<b>{{ c.hora_inicio|hora12 }}</b>{% else %}<span class="badge text-bg-warning">s/h</span>{% endif %} {{ c.paciente.nombre_completo }}</a>{% empty %}<div class="list-group-item text-muted py-1">—</div>{% endfor %}
+    </div>
+  </div></div>
+  {% endfor %}
+</div>
+{% endblock %}

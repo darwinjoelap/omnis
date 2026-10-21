@@ -1,0 +1,205 @@
+"""Consulta clínica: abrir, llenar con la plantilla, cerrar, enmendar, anular, imprimir y adjuntos (Fase 07)."""
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
+from django.http import FileResponse, Http404, HttpResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils.html import format_html_join
+from django.views.decorators.http import require_POST
+
+from apps.configuracion.models import Lugar
+from apps.core import auditoria
+from apps.core.excepciones import ErrorDeNegocio
+from apps.core.permisos import requiere
+from apps.pacientes.models import Paciente, normalizar_texto
+
+from . import consultas as srv
+from .formularios import FormularioSeccion
+from .models import Adjunto, Cie10, Consulta, PlantillaHistoria
+
+MAX_ADJUNTO = 10 * 1024 * 1024
+
+
+def _consulta_visible(request, pk):
+    consulta = get_object_or_404(Consulta.objects.select_related(
+        'paciente', 'profesional__membresia__usuario', 'especialidad', 'tenant__configuracion', 'lugar'), pk=pk)
+    if not srv.puede_ver(request.membresia, consulta):
+        auditoria.registrar(request, 'EXCEPCION', consulta, paciente_id=consulta.paciente_id,
+                            detalle='Intento de ver una consulta sin permiso')
+        raise PermissionDenied
+    return consulta
+
+
+def _formularios(consulta, data=None):
+    guardados = srv.datos_guardados(consulta)
+    contexto = srv.contexto_calculo(consulta)
+    formularios = []
+    for item in consulta.estructura:
+        form = FormularioSeccion(item['campos'], data, initial=guardados.get(item['seccion_id']) or {},
+                                 prefix=f's{item["seccion_id"]}', contexto=contexto, exigir_requeridos=False)
+        formularios.append((item, form))
+    return formularios
+
+
+@login_required
+@requiere('consultas.crear')
+@require_POST
+def nueva(request, paciente_pk):
+    paciente = get_object_or_404(Paciente.objects.all(), pk=paciente_pk)
+    from apps.pacientes.selectors import puede_ver_paciente
+    if not puede_ver_paciente(request.membresia, paciente):
+        raise PermissionDenied
+    perfil = request.membresia.perfil_activo
+    plantilla = None
+    if request.POST.get('plantilla'):
+        plantilla = get_object_or_404(PlantillaHistoria.objects.filter(activa=True), pk=request.POST['plantilla'])
+    lugar = Lugar.objects.filter(pk=request.POST.get('lugar') or 0).first()
+    tipo = request.POST.get('tipo') if request.POST.get('tipo') in Consulta.Tipo.values else Consulta.Tipo.PRIMERA
+    consulta = srv.abrir_consulta(paciente=paciente, profesional=perfil, plantilla=plantilla, tipo=tipo, lugar=lugar)
+    auditoria.registrar(request, 'CREAR', consulta, paciente_id=paciente.pk)
+    return redirect('clinica:consulta_editar', pk=consulta.pk)
+
+
+@login_required
+@requiere('historia.ver')
+def editar(request, pk):
+    consulta = _consulta_visible(request, pk)
+    if not srv.puede_editar(request.membresia, consulta):
+        return redirect('clinica:consulta', pk=pk)
+    formularios = _formularios(consulta, request.POST if request.method == 'POST' else None)
+    if request.method == 'POST':
+        if all(f.is_valid() for _, f in formularios):
+            srv.guardar_secciones(consulta, {item['seccion_id']: f.datos_limpios for item, f in formularios})
+            auditoria.registrar(request, 'EDITAR', consulta, paciente_id=consulta.paciente_id)
+            if request.POST.get('accion') == 'cerrar':
+                try:
+                    srv.cerrar_consulta(consulta, request.user)
+                except ErrorDeNegocio as e:
+                    messages.warning(request, f'Guardada, pero no se cerró. {e}')
+                    return redirect('clinica:consulta_editar', pk=pk)
+                auditoria.registrar(request, 'CERRAR', consulta, paciente_id=consulta.paciente_id)
+                messages.success(request, 'Consulta cerrada.')
+                return redirect('clinica:consulta', pk=pk)
+            messages.success(request, 'Consulta guardada.')
+            return redirect('clinica:consulta_editar', pk=pk)
+        messages.error(request, 'Revisa los campos marcados en rojo; no se guardó nada.')
+    from .selectors import consultas_visibles
+    previas = [c for c in consultas_visibles(request, consulta.paciente) if c.pk != consulta.pk][:5]
+    antecedentes = getattr(consulta.paciente, 'antecedentes', None)
+    return render(request, 'clinica/consulta_form.html', {
+        'titulo': f'Consulta · {consulta.paciente}', 'consulta': consulta, 'formularios': formularios,
+        'previas': previas, 'antecedentes': antecedentes, 'faltan': srv.faltantes(consulta)})
+
+
+@login_required
+@requiere('historia.ver')
+def detalle(request, pk):
+    consulta = _consulta_visible(request, pk)
+    auditoria.registrar(request, 'VER', consulta, paciente_id=consulta.paciente_id)
+    lectura = srv.lectura(consulta)
+    con_datos = {item['seccion_id'] for item, _ in lectura}
+    return render(request, 'clinica/consulta.html', {
+        'titulo': f'Consulta · {consulta.paciente}', 'consulta': consulta, 'lectura': lectura,
+        'vacias': [i for i in consulta.estructura if i['seccion_id'] not in con_datos],
+        'es_autor': request.membresia.perfil_activo and consulta.profesional_id == request.membresia.perfil_activo.pk,
+        'enmiendas': consulta.enmiendas.select_related('seccion', 'creado_por'),
+        'adjuntos': consulta.adjuntos.all()})
+
+
+@login_required
+@requiere('historia.ver')
+def imprimir(request, pk):
+    """Historia de la consulta lista para imprimir o guardar como PDF desde el navegador."""
+    consulta = _consulta_visible(request, pk)
+    auditoria.registrar(request, 'IMPRIMIR', consulta, paciente_id=consulta.paciente_id)
+    return render(request, 'clinica/consulta_imprimir.html', {
+        'consulta': consulta, 'lectura': srv.lectura(consulta), 'config': request.tenant.configuracion,
+        'enmiendas': consulta.enmiendas.select_related('seccion')})
+
+
+@login_required
+@requiere('historia.ver')
+def enmendar(request, pk, seccion_id):
+    consulta = _consulta_visible(request, pk)
+    perfil = request.membresia.perfil_activo
+    if consulta.profesional_id != perfil.pk or consulta.estado != Consulta.Estado.CERRADA:
+        raise PermissionDenied
+    item = next((i for i in consulta.estructura if i['seccion_id'] == seccion_id), None)
+    if item is None:
+        raise Http404
+    form = FormularioSeccion(item['campos'], request.POST or None,
+                             initial=srv.datos_guardados(consulta).get(seccion_id) or {},
+                             prefix=f's{seccion_id}', contexto=srv.contexto_calculo(consulta))
+    if request.method == 'POST' and form.is_valid():
+        try:
+            srv.enmendar(consulta, seccion_id, form.datos_limpios, request.POST.get('motivo'))
+        except ErrorDeNegocio as e:
+            messages.error(request, str(e))
+        else:
+            auditoria.registrar(request, 'ENMENDAR', consulta, paciente_id=consulta.paciente_id,
+                                detalle=item['nombre'])
+            messages.success(request, 'Enmienda registrada.')
+            return redirect('clinica:consulta', pk=pk)
+    return render(request, 'clinica/consulta_enmendar.html', {
+        'titulo': f'Enmendar · {item["nombre"]}', 'consulta': consulta, 'item': item, 'form': form})
+
+
+@login_required
+@requiere('historia.ver')
+@require_POST
+def anular(request, pk):
+    consulta = _consulta_visible(request, pk)
+    if consulta.profesional_id != request.membresia.perfil_activo.pk:
+        raise PermissionDenied
+    srv.anular_consulta(consulta, request.POST.get('motivo'))
+    auditoria.registrar(request, 'ANULAR', consulta, paciente_id=consulta.paciente_id,
+                        detalle=request.POST.get('motivo', ''))
+    messages.success(request, 'Consulta anulada. Queda en la historia marcada como anulada.')
+    return redirect('pacientes:detalle', pk=consulta.paciente_id)
+
+
+@login_required
+@requiere('historia.ver')
+@require_POST
+def adjuntar(request, pk):
+    consulta = _consulta_visible(request, pk)
+    archivo = request.FILES.get('archivo')
+    if not archivo:
+        messages.error(request, 'Elige un archivo.')
+    elif archivo.size > MAX_ADJUNTO:
+        messages.error(request, 'El archivo supera 10 MB.')
+    else:
+        Adjunto.objects.create(paciente=consulta.paciente, consulta=consulta, archivo=archivo,
+                               nombre=(request.POST.get('nombre') or archivo.name)[:200],
+                               tipo_contenido=getattr(archivo, 'content_type', '')[:100], tamano=archivo.size)
+        messages.success(request, 'Archivo adjuntado.')
+    return redirect('clinica:consulta', pk=pk)
+
+
+@login_required
+@requiere('historia.ver')
+def adjunto(request, pk):
+    """Los adjuntos solo se entregan por aquí, con permiso y auditoría (ADR-017)."""
+    a = get_object_or_404(Adjunto.objects.select_related('consulta'), pk=pk)
+    if a.consulta and not srv.puede_ver(request.membresia, a.consulta):
+        raise PermissionDenied
+    auditoria.registrar(request, 'VER', a, paciente_id=a.paciente_id)
+    respuesta = FileResponse(a.archivo.open('rb'), content_type=a.tipo_contenido or 'application/octet-stream')
+    respuesta['Content-Disposition'] = f'inline; filename="{a.nombre}"'
+    respuesta['Cache-Control'] = 'no-store'
+    return respuesta
+
+
+@login_required
+@requiere('historia.ver')
+def cie10(request):
+    """Opciones para el campo de diagnóstico: <option value="J06.9 · Infección…">."""
+    q = normalizar_texto(request.GET.get('q', ''))
+    opciones = []
+    if len(q) >= 2:
+        qs = Cie10.objects.all()
+        for palabra in q.split():
+            qs = qs.filter(busqueda__contains=palabra)
+        opciones = qs[:20]
+    return HttpResponse(format_html_join('', '<option value="{} · {}"></option>',
+                                         ((c.codigo, c.descripcion) for c in opciones)))

@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% block contenido %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <div>
+    <h1 class="h3 mb-0">Equipo</h1>
+    <div class="small text-muted">{% if max_usuarios %}Hasta {{ max_usuarios }} usuarios activos{% else %}Usuarios sin límite{% endif %}{% if max_profesionales %} · hasta {{ max_profesionales }} profesionales{% endif %}</div>
+  </div>
+  <button class="btn btn-primary btn-sm" data-bs-toggle="collapse" data-bs-target="#agregar"><i class="bi bi-person-plus me-1"></i>Agregar persona</button>
+</div>
+<div class="collapse mb-3 {% if form.errors %}show{% endif %}" id="agregar">
+  <form method="post" action="{% url 'equipo:agregar' %}" class="card card-body" style="max-width:820px">{% csrf_token %}
+    <div class="row g-2">
+      <div class="col-md-4">{% include 'partials/campo.html' with campo=form.username %}</div>
+      <div class="col-md-4">{% include 'partials/campo.html' with campo=form.nombre %}</div>
+      <div class="col-md-4">{% include 'partials/campo.html' with campo=form.apellido %}</div>
+      <div class="col-md-4">{% include 'partials/campo.html' with campo=form.rol %}</div>
+      <div class="col-md-8">{% include 'partials/campo.html' with campo=form.email %}</div>
+      <div class="col-12 mt-2">{% include 'partials/campo.html' with campo=form.es_profesional %}</div>
+      <div class="col-md-6 js-profesional">{% include 'partials/campo.html' with campo=form.especialidad %}</div>
+      <div class="col-md-3 js-profesional">{% include 'partials/campo.html' with campo=form.titulo %}</div>
+    </div>
+    <p class="small text-muted mt-2 mb-2">Se crea con una <b>contraseña temporal</b> que verás una sola vez; la persona debe cambiarla al entrar. Entra por el enlace <code>/{{ tenant.slug }}/</code>. Firma, sello y registros (MPPS, colegio) se cargan después en su perfil profesional.</p>
+    <div><button class="btn btn-primary btn-sm">Agregar</button></div>
+  </form>
+</div>
+
+<div class="card"><div class="table-responsive">
+  <table class="table align-middle mb-0">
+    <thead class="table-light"><tr><th>Persona</th><th>Rol</th><th>Especialidad</th><th class="d-none d-md-table-cell">Último acceso</th><th class="text-end">Acciones</th></tr></thead>
+    <tbody>
+    {% for m in miembros %}
+      <tr class="{% if not m.activa %}text-muted{% endif %}">
+        <td>
+          <div class="fw-semibold">{% if m.perfil_activo %}{{ m.perfil_activo.nombre_con_titulo }}{% else %}{{ m.usuario.get_full_name|default:"(sin nombre)" }}{% endif %}{% if m.usuario_id == user.pk %} <span class="badge text-bg-light border">Tú</span>{% endif %}{% if not m.activa %} <span class="badge text-bg-secondary">Inactivo</span>{% endif %}</div>
+          <div class="small text-muted"><i class="bi bi-person"></i> {{ m.usuario.username }}{% if m.usuario.email %} · {{ m.usuario.email }}{% endif %}{% if m.usuario.debe_cambiar_clave %} · <span class="text-warning-emphasis">contraseña temporal</span>{% endif %}</div>
+        </td>
+        <td>
+          {% if m.gestionable %}
+          <form method="post" action="{% url 'equipo:actualizar' m.pk %}" class="d-flex gap-1 align-items-center">{% csrf_token %}
+            <input type="hidden" name="activa" value="{% if m.activa %}1{% else %}0{% endif %}">
+            <select name="rol" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()" aria-label="Rol">
+              {% for v, n in roles %}<option value="{{ v }}" {% if v == m.rol %}selected{% endif %}>{{ n }}</option>{% endfor %}
+            </select>
+          </form>
+          {% else %}{{ m.get_rol_display }}{% endif %}
+        </td>
+        <td>
+          {% if m.perfil_activo %}
+            <a href="{% url 'equipo:perfil_profesional' m.pk %}" class="text-decoration-none"><span class="om-color-punto me-1" style="background:{{ m.perfil_activo.color_agenda }}"></span>{{ m.perfil_activo.especialidad }}</a>
+            {% if not m.perfil_activo.tiene_firma %}<div class="small text-warning-emphasis"><i class="bi bi-exclamation-circle"></i> Sin firma ni sello</div>{% endif %}
+          {% else %}
+            <a href="{% url 'equipo:perfil_profesional' m.pk %}" class="small">Hacer profesional</a>
+          {% endif %}
+        </td>
+        <td class="d-none d-md-table-cell small">{{ m.usuario.last_login|date:"d/m/Y"|default:"Nunca" }} {{ m.usuario.last_login|hora12 }}</td>
+        <td class="text-end text-nowrap">
+          {% if m.gestionable %}
+            {% if m.clave_restablecible %}
+            <form method="post" action="{% url 'equipo:clave' m.pk %}" class="d-inline" onsubmit="return confirm('¿Generar una contraseña temporal nueva para {{ m.usuario.username }}? La actual dejará de funcionar.')">{% csrf_token %}
+              <button class="btn btn-sm btn-outline-secondary" title="Restablecer contraseña"><i class="bi bi-key"></i></button></form>
+            {% endif %}
+            {% if m.perfil_activo and m.rol != 'MEDICO' %}
+            <form method="post" action="{% url 'equipo:quitar_perfil' m.pk %}" class="d-inline" onsubmit="return confirm('¿{{ m.usuario.username }} deja de atender pacientes? Sus consultas se conservan.')">{% csrf_token %}
+              <button class="btn btn-sm btn-outline-secondary" title="Quitar perfil profesional"><i class="bi bi-person-dash"></i></button></form>
+            {% endif %}
+            <form method="post" action="{% url 'equipo:actualizar' m.pk %}" class="d-inline">{% csrf_token %}
+              <input type="hidden" name="rol" value="{{ m.rol }}">
+              {% if m.activa %}<input type="hidden" name="activa" value="0"><button class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Quitar el acceso de {{ m.usuario.username }} a este consultorio?')">Desactivar</button>
+              {% else %}<input type="hidden" name="activa" value="1"><button class="btn btn-sm btn-outline-success">Reactivar</button>{% endif %}
+            </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div></div>
+<p class="small text-muted mt-2">Titular y Administrador configuran el consultorio y el equipo; Médico atiende; Asistente maneja pacientes, agenda y cobros, sin ver el contenido clínico. Un Titular también puede atender si tiene perfil profesional. Nadie cambia su propio rol, y solo un Titular asigna o modifica a otro Titular.</p>
+{% endblock %}
+{% block extra_js %}
+<script>
+(function () {
+  const chk = document.getElementById('id_es_profesional'), rol = document.getElementById('id_rol');
+  function ver() {
+    if (rol.value === 'MEDICO') chk.checked = true;
+    document.querySelectorAll('.js-profesional').forEach((el) => { el.hidden = !chk.checked; });
+  }
+  chk.addEventListener('change', ver); rol.addEventListener('change', ver); ver();
+})();
+</script>
+{% endblock %}

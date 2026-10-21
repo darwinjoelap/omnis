@@ -1,0 +1,94 @@
+// Omnis PWA: registro del service worker, aviso de instalación y estado de conexión.
+(function () {
+  'use strict';
+  const CLAVE = 'omnis.instalar.descartado';
+  const DIAS = 30;
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function () {});
+    });
+  }
+
+  const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  if (standalone) document.documentElement.classList.add('om-instalada');
+
+  // PDF dentro de la app instalada: abrirlos directo saca de la app y "atrás" la cierra.
+  // Los enlaces/formularios con data-pdf se muestran en el visor interno (/visor/), que sí vuelve con "atrás".
+  if (standalone) {
+    const visor = function (href) {
+      const u = new URL(href, location.href);
+      return u.origin === location.origin ? '/visor/?u=' + encodeURIComponent(u.pathname + u.search) : null;
+    };
+    document.addEventListener('click', function (e) {
+      const a = e.target.closest('a[data-pdf]');
+      const destino = a && visor(a.href);
+      if (destino) { e.preventDefault(); location.href = destino; }
+    });
+    document.addEventListener('submit', function (e) {
+      const f = e.target;
+      if (!f.matches || !f.matches('form[data-pdf]') || (f.method || 'get').toLowerCase() !== 'get') return;
+      const destino = visor(f.action.split('?')[0] + '?' + new URLSearchParams(new FormData(f)).toString());
+      if (destino) { e.preventDefault(); location.href = destino; }
+    });
+  }
+
+  // Al cerrar sesión se borran las páginas guardadas para usar sin conexión en este dispositivo (Fase 12)
+  document.addEventListener('submit', function (e) {
+    if (e.target.matches && e.target.matches('form[action$="/cuenta/salir/"]') && window.caches) {
+      caches.keys().then(function (claves) {
+        claves.filter(function (k) { return k.indexOf('omnis-paginas') === 0; }).forEach(function (k) { caches.delete(k); });
+      });
+    }
+  });
+
+  function descartadoReciente() {
+    try {
+      const t = parseInt(localStorage.getItem(CLAVE) || '0', 10);
+      return t && (Date.now() - t) < DIAS * 864e5;
+    } catch (e) { return false; }
+  }
+  function descartar() {
+    try { localStorage.setItem(CLAVE, String(Date.now())); } catch (e) {}
+    const b = document.getElementById('om-instalar'); if (b) b.hidden = true;
+  }
+
+  function mostrar(modo) {
+    const b = document.getElementById('om-instalar');
+    if (!b || standalone || descartadoReciente()) return;
+    b.querySelectorAll('[data-modo]').forEach(function (el) { el.hidden = el.dataset.modo !== modo; });
+    b.hidden = false;
+  }
+
+  // Android / Chrome / Edge: prompt nativo
+  let evento = null;
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    evento = e;
+    mostrar('nativo');
+  });
+  window.addEventListener('appinstalled', descartar);
+
+  document.addEventListener('click', function (e) {
+    if (e.target.closest('[data-om-instalar]') && evento) {
+      evento.prompt();
+      evento.userChoice.finally(function () { evento = null; descartar(); });
+    }
+    if (e.target.closest('[data-om-descartar]')) descartar();
+  });
+
+  // iPhone / iPad (Safari): no hay prompt, se explica cómo hacerlo
+  const ua = navigator.userAgent;
+  const esIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const esSafari = /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS/.test(ua);
+  if (esIOS && esSafari) window.addEventListener('load', function () { setTimeout(function () { mostrar('ios'); }, 1500); });
+
+  // Estado de conexión
+  function conexion() {
+    const a = document.getElementById('om-sin-conexion');
+    if (a) a.hidden = navigator.onLine;
+  }
+  window.addEventListener('online', conexion);
+  window.addEventListener('offline', conexion);
+  document.addEventListener('DOMContentLoaded', conexion);
+})();

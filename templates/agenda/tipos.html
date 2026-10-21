@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block contenido %}
+<h1 class="h3 mb-2">Tipos de cita</h1>
+{% include 'agenda/_submenu.html' %}
+<div class="row g-3">
+  <div class="col-lg-7"><div class="card"><div class="list-group list-group-flush">
+    {% for t in tipos %}<a href="{% url 'agenda:tipo_editar' t.pk %}" class="list-group-item list-group-item-action {% if not t.activo %}text-muted{% endif %}" style="border-left:4px solid {{ t.color }}">
+      <div class="fw-semibold">{{ t.nombre }}{% if not t.activo %} <span class="badge text-bg-secondary">Inactivo</span>{% endif %}</div>
+      <div class="small text-muted">{{ t.duracion_min }} min · {{ t.get_tipo_consulta_display }}{% if t.especialidad %} · {{ t.especialidad }}{% endif %}{% if t.servicio %} · cobra «{{ t.servicio }}»{% endif %}{% if t.plantilla %} · plantilla «{{ t.plantilla }}»{% endif %}</div></a>
+    {% empty %}<div class="list-group-item small text-muted">Aún no hay tipos. Ejemplos: Primera consulta (45 min), Control (20 min), Niño sano, Control prenatal.</div>{% endfor %}
+  </div></div></div>
+  <div class="col-lg-5">
+    <form method="post" class="card card-body">{% csrf_token %}
+      <h2 class="h6">{% if tipo %}Editar «{{ tipo }}»{% else %}Nuevo tipo de cita{% endif %}</h2>
+      <div class="row g-2">
+        <div class="col-12">{% include 'partials/campo.html' with campo=form.nombre %}</div>
+        <div class="col-6">{% include 'partials/campo.html' with campo=form.duracion_min %}</div>
+        <div class="col-6">{% include 'partials/campo.html' with campo=form.color %}</div>
+        <div class="col-12">{% include 'partials/campo.html' with campo=form.tipo_consulta %}</div>
+        <div class="col-12">{% include 'partials/campo.html' with campo=form.especialidad %}</div>
+        <div class="col-12">{% include 'partials/campo.html' with campo=form.plantilla %}</div>
+        <div class="col-12">{% include 'partials/campo.html' with campo=form.servicio %}</div>
+        <div class="col-12">{% include 'partials/campo.html' with campo=form.activo %}</div>
+      </div>
+      <div class="mt-2 d-flex gap-2"><button class="btn btn-primary btn-sm">Guardar</button>{% if tipo %}<a href="{% url 'agenda:tipos' %}" class="btn btn-link btn-sm">Nuevo</a>{% endif %}</div>
+    </form>
+  </div>
+</div>
+{% endblock %}

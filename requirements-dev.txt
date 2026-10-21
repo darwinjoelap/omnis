@@ -1,0 +1,4 @@
+-r requirements.txt
+django-debug-toolbar==8.0.0
+ruff
+pypdf==5.9.0

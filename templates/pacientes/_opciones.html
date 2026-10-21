@@ -1,0 +1,10 @@
+{% if q|length >= 2 %}
+<div class="list-group">
+  {% for p in pacientes %}
+    <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between" data-paciente="{{ p.pk }}" data-nombre="{{ p.nombre_completo }}">
+      <span>{{ p.nombre_completo }}</span><span class="small text-muted">{{ p.documento }} · {{ p.edad_texto }}</span></button>
+  {% empty %}
+    <div class="list-group-item small text-muted">Sin resultados para «{{ q }}».</div>
+  {% endfor %}
+</div>
+{% endif %}

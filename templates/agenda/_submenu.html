@@ -1,0 +1,5 @@
+<ul class="nav nav-pills mb-3 small">
+  <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'horarios' %}active{% endif %}" href="{% url 'agenda:horarios' %}">Horarios</a></li>
+  {% if 'tenant.configurar' in permisos %}<li class="nav-item"><a class="nav-link {% if 'tipo' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'agenda:tipos' %}">Tipos de cita</a></li>{% endif %}
+  <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'bloqueos' %}active{% endif %}" href="{% url 'agenda:bloqueos' %}">Bloqueos y vacaciones</a></li>
+</ul>

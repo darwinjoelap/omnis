@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% load documentos %}
+{% block contenido %}
+{% with p=consulta.paciente %}
+<a href="{% url 'pacientes:detalle' p.pk %}" class="small text-decoration-none"><i class="bi bi-arrow-left"></i> {{ p }}</a>
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mt-1 mb-3">
+  <div>
+    <h1 class="h4 mb-0">Consulta del {{ consulta.fecha_hora|date:"d/m/Y" }} <span class="small text-muted fw-normal">{{ consulta.fecha_hora|hora12 }}</span></h1>
+    <div class="small text-muted">{{ consulta.profesional }} · {{ consulta.especialidad }} · {{ consulta.get_tipo_display }}{% if consulta.lugar %} · {{ consulta.lugar }}{% endif %}</div>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    {% if consulta.estado == 'BORRADOR' %}<span class="badge text-bg-warning align-self-center">En curso</span>{% if es_autor %}<a href="{% url 'clinica:consulta_editar' consulta.pk %}" class="btn btn-primary btn-sm"><i class="bi bi-pencil me-1"></i>Continuar</a>{% endif %}
+    {% elif consulta.estado == 'CERRADA' %}<span class="badge text-bg-success align-self-center" title="Cerrada el {{ consulta.cerrada_en|date:'d/m/Y' }}">Cerrada</span>
+    {% else %}<span class="badge text-bg-danger align-self-center">Anulada</span>{% endif %}
+    <a href="{% url 'clinica:consulta_imprimir' consulta.pk %}" target="_blank" class="btn btn-outline-secondary btn-sm"><i class="bi bi-printer me-1"></i>Imprimir</a>
+    {% if 'cobros.gestionar' in permisos and consulta.estado != 'ANULADA' %}<a href="{% url 'cobros:cuenta' consulta.paciente_id %}?consulta={{ consulta.pk }}" class="btn btn-outline-success btn-sm"><i class="bi bi-cash-coin me-1"></i>Cobrar</a>{% endif %}
+    {% if consulta.estado != 'ANULADA' %}{% menu_documentos p consulta %}{% endif %}
+  </div>
+</div>
+{% if consulta.estado == 'ANULADA' %}<div class="alert alert-danger py-2 small">Anulada: {{ consulta.motivo_anulacion }}</div>{% endif %}
+{% for item, filas in lectura %}
+  <div class="card om-seccion {% if item.ambito == 'PACIENTE' %}om-ambito-paciente{% endif %} mb-2">
+    <div class="card-header py-2">{{ item.nombre }}
+      {% if es_autor and consulta.estado == 'CERRADA' %}<a href="{% url 'clinica:consulta_enmendar' consulta.pk item.seccion_id %}" class="ms-auto small fw-normal">Enmendar</a>{% endif %}</div>
+    <div class="card-body py-2 small">
+      <dl class="row mb-0">{% for c, texto in filas %}<dt class="col-sm-3 fw-semibold text-muted">{{ c.etiqueta }}</dt><dd class="col-sm-9 mb-1">{{ texto|linebreaksbr }}</dd>{% endfor %}</dl>
+    </div>
+  </div>
+{% empty %}
+  <div class="card card-body text-muted">La consulta aún no tiene datos.</div>
+{% endfor %}
+{% if es_autor and consulta.estado == 'CERRADA' and vacias %}
+  <p class="small text-muted">Secciones sin datos (puedes completarlas con una enmienda): {% for item in vacias %}<a href="{% url 'clinica:consulta_enmendar' consulta.pk item.seccion_id %}">{{ item.nombre }}</a>{% if not forloop.last %} · {% endif %}{% endfor %}</p>
+{% endif %}
+<div class="row g-3 mt-1">
+  <div class="col-md-6"><div class="card"><div class="card-header bg-white fw-semibold">Documentos emitidos</div>{% documentos_emitidos consulta=consulta %}</div></div>
+  <div class="col-md-6"><div class="card"><div class="card-header bg-white fw-semibold">Adjuntos</div>
+    <ul class="list-group list-group-flush small">{% for a in adjuntos %}<li class="list-group-item"><a href="{% url 'clinica:adjunto' a.pk %}" target="_blank">{{ a.nombre }}</a> <span class="text-muted">· {{ a.creado_en|date:"d/m/Y" }}</span></li>{% empty %}<li class="list-group-item text-muted">Sin adjuntos.</li>{% endfor %}</ul>
+    {% if consulta.estado != 'ANULADA' %}<form method="post" action="{% url 'clinica:consulta_adjuntar' consulta.pk %}" enctype="multipart/form-data" class="card-body d-flex gap-2" data-offline="off">{% csrf_token %}
+      <input type="file" name="archivo" class="form-control form-control-sm" required><button class="btn btn-sm btn-outline-primary">Subir</button></form>{% endif %}
+  </div></div>
+  {% if enmiendas %}<div class="col-md-6"><div class="card"><div class="card-header bg-white fw-semibold">Enmiendas</div>
+    <ul class="list-group list-group-flush small">{% for e in enmiendas %}<li class="list-group-item"><b>{{ e.seccion }}</b> · {{ e.creado_en|date:"d/m/Y" }} {{ e.creado_en|hora12 }} · {{ e.creado_por.nombre_visible }}<br><span class="text-muted">Motivo: {{ e.motivo }}</span></li>{% endfor %}</ul>
+  </div></div>{% endif %}
+</div>
+{% endwith %}
+{% endblock %}

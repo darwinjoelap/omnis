@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block contenido %}
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+  <div>
+    <h1 class="h3 mb-1">Configuración del consultorio</h1>
+    <p class="text-muted mb-0">Identidad, documentos, historia clínica y agenda.</p>
+  </div>
+  <a href="{% url 'configuracion:pdf_prueba' %}" target="_blank" data-pdf class="btn btn-outline-primary"><i class="bi bi-file-earmark-pdf me-1"></i>Ver PDF de prueba</a>
+</div>
+<form method="post" enctype="multipart/form-data" style="max-width:900px">
+  {% csrf_token %}
+  <input type="hidden" name="tab" id="tab-activa" value="{{ tab }}">
+  {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+  <ul class="nav nav-tabs om-tabs mb-3" role="tablist">
+    {% for clave, titulo, campos in form.grupos %}
+      <li class="nav-item" role="presentation">
+        <button class="nav-link {% if clave == tab %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-{{ clave }}" data-tab="{{ clave }}" type="button" role="tab">
+          {{ titulo }}{% for c in campos %}{% if c.errors %}<span class="badge bg-danger ms-1">!</span>{% endif %}{% endfor %}
+        </button>
+      </li>
+    {% endfor %}
+  </ul>
+  <div class="card">
+    <div class="card-body tab-content">
+      {% for clave, titulo, campos in form.grupos %}
+        <div class="tab-pane fade {% if clave == tab %}show active{% endif %}" id="tab-{{ clave }}" role="tabpanel">
+          <div class="row g-3">
+            {% for campo in campos %}
+              <div class="{% if campo.name in 'direccion mensaje_whatsapp pie_documentos visibilidad_historia membrete' %}col-12{% else %}col-md-6{% endif %}">
+                {% if campo.name == 'logo' and form.instance.logo %}
+                  <div class="d-flex align-items-center gap-3 mb-2"><img src="{{ form.instance.logo.url }}" alt="Logo actual" class="om-logo-actual">{% include 'partials/campo.html' with campo=form.quitar_logo %}</div>
+                {% endif %}
+                {% if campo.name == 'membrete' and form.instance.membrete %}
+                  <div class="d-flex align-items-center gap-3 mb-2"><img src="{{ form.instance.membrete.url }}" alt="Membrete actual" class="om-logo-actual" style="max-width:320px">{% include 'partials/campo.html' with campo=form.quitar_membrete %}</div>
+                {% endif %}
+                {% include 'partials/campo.html' with campo=campo %}
+              </div>
+            {% endfor %}
+            {% if clave == 'historia' %}
+              <div class="col-12 small text-muted">Alergias, medicación actual y antecedentes generales del paciente los ven <b>siempre</b> todos los médicos del consultorio, sea cual sea la visibilidad elegida.</div>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+    <div class="card-footer bg-white d-flex justify-content-end">
+      <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Guardar</button>
+    </div>
+  </div>
+</form>
+{% endblock %}
+{% block extra_js %}
+<script>
+  document.querySelectorAll('[data-tab]').forEach(function (b) {
+    b.addEventListener('shown.bs.tab', function () { document.getElementById('tab-activa').value = b.dataset.tab; });
+  });
+</script>
+{% endblock %}

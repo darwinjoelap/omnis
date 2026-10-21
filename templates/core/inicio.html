@@ -1,0 +1,99 @@
+{% extends 'base.html' %}
+{% block contenido %}
+{% if not tenant %}
+  <h1 class="h3">Hola, {{ user.first_name|default:user.username }}</h1>
+  <p class="text-muted">Entra a un consultorio desde el <a href="{% url 'plataforma:lista' %}">panel de plataforma</a>.</p>
+{% else %}
+<div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-4">
+  <div>
+    <div class="text-muted">{{ hoy|date:"l j \d\e F"|lower|capfirst }} · {{ config.nombre_display }}</div>
+    <h1 class="h2 mb-0">{{ saludo }}, {% if profesional %}{{ profesional.nombre_con_titulo }}{% else %}{{ user.first_name|default:user.username }}{% endif %}</h1>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    {% if 'agenda.gestionar' in permisos %}<a href="{% url 'agenda:cita_nueva' %}" class="btn btn-outline-primary"><i class="bi bi-calendar-plus me-1"></i>Agendar cita</a>{% endif %}
+    {% if 'pacientes.gestionar' in permisos %}<a href="{% url 'pacientes:nuevo' %}" class="btn btn-primary"><i class="bi bi-person-plus me-1"></i>Nuevo paciente</a>{% endif %}
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  {% if 'agenda.ver' in permisos %}
+  <div class="col-6 col-xl-3"><div class="card h-100"><div class="card-body">
+    <div class="om-cifra-etiqueta">{% if citas_hoy_propias %}Mis citas de hoy{% else %}Citas de hoy{% endif %}</div>
+    <div class="om-cifra">{{ citas_activas|default:0 }}</div>
+    <div class="small fw-semibold text-success">{% if citas_en_sala %}{{ citas_en_sala }} en sala{% else %}Nadie en sala{% endif %}</div>
+  </div></div></div>
+  {% endif %}
+  {% if profesional %}
+  <div class="col-6 col-xl-3"><div class="card h-100"><div class="card-body">
+    <div class="om-cifra-etiqueta">Consultas en curso</div>
+    <div class="om-cifra">{{ en_curso|length }}</div>
+    <div class="small {% if en_curso %}fw-semibold om-texto-aviso{% else %}text-muted{% endif %}">{% if en_curso %}Sin cerrar{% else %}Todo cerrado{% endif %}</div>
+  </div></div></div>
+  {% endif %}
+  {% if 'cobros.gestionar' in permisos %}
+  <div class="col-6 col-xl-3"><a href="{% url 'cobros:caja' %}" class="card h-100 text-decoration-none"><div class="card-body">
+    <div class="om-cifra-etiqueta">Cobrado hoy</div>
+    <div class="om-cifra">{{ cobrado_hoy|usd }}</div>
+    <div class="small text-muted">{{ pagos_hoy }} pago{{ pagos_hoy|pluralize }}</div>
+  </div></a></div>
+  {% endif %}
+  {% if 'pacientes.ver' in permisos %}
+  <div class="col-6 col-xl-3"><a href="{% url 'pacientes:lista' %}" class="card h-100 text-decoration-none"><div class="card-body">
+    <div class="om-cifra-etiqueta">{% if pacientes_mios %}Mis pacientes{% else %}Pacientes{% endif %}</div>
+    <div class="om-cifra">{{ total_pacientes|default:0|miles }}</div>
+    <div class="small text-muted">activos</div>
+  </div></a></div>
+  {% endif %}
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center"><span>Agenda de hoy</span><a href="{% url 'agenda:dia' %}" class="small fw-normal">Ver agenda</a></div>
+      <div class="list-group list-group-flush">
+        {% for c in citas_hoy %}{% include 'agenda/_cita_fila.html' with mostrar_profesional=citas_hoy_propias|yesno:',1' %}{% empty %}<div class="list-group-item small text-muted">No hay citas para hoy.</div>{% endfor %}
+      </div>
+    </div>
+    {% if en_curso %}
+    <div class="card mt-3"><div class="card-header">Consultas en curso</div>
+      <div class="list-group list-group-flush">{% for c in en_curso %}
+        <a href="{% url 'clinica:consulta_editar' c.pk %}" class="list-group-item list-group-item-action small d-flex justify-content-between"><span>{{ c.paciente }}</span><span class="text-muted">{{ c.fecha_hora|date:"d/m/Y" }} {{ c.fecha_hora|hora12 }}</span></a>
+      {% endfor %}</div>
+    </div>
+    {% endif %}
+  </div>
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-header">Buscar paciente</div>
+      <div class="card-body">
+        <form action="{% url 'pacientes:lista' %}" class="mb-3"><label for="buscar-inicio" class="visually-hidden">Nombre o cédula</label><input id="buscar-inicio" name="q" type="search" class="form-control" placeholder="Nombre o cédula" autocomplete="off"></form>
+        {% if pacientes_recientes %}
+          <div class="small text-muted mb-1">Registrados recientemente</div>
+          <div class="list-group list-group-flush">
+          {% for p in pacientes_recientes %}
+            <a href="{% url 'pacientes:detalle' p.pk %}" class="list-group-item list-group-item-action px-0 d-flex justify-content-between">
+              <span>{{ p.nombre_completo }}</span><span class="small text-muted">{{ p.documento }}</span></a>
+          {% endfor %}
+          </div>
+        {% else %}<p class="small text-muted mb-0">Aún no hay pacientes.</p>{% endif %}
+      </div>
+    </div>
+  </div>
+  {% if 'tenant.configurar' in permisos %}
+  <div class="col-12">
+    <div class="card om-panel-arena"><div class="card-body small">
+      <div class="h6 mb-2">Para empezar</div>
+      <ul class="mb-0 ps-3">
+        <li><a href="{% url 'configuracion:editar' %}">Configuración</a>: logo, datos y color del consultorio.</li>
+        <li><a href="{% url 'configuracion:lugares' %}">Lugares de consulta</a> donde atiendes.</li>
+        <li><a href="{% url 'equipo:lista' %}">Equipo</a>: médicos (con su especialidad) y asistentes.</li>
+        <li><a href="{% url 'cobros:servicios' %}">Servicios y precios</a> en USD.</li>
+        {% if profesional %}<li><a href="{% url 'equipo:mi_perfil_profesional' %}">Mi perfil profesional</a>: firma, sello y registros para los récipes.</li>
+        <li><a href="{% url 'clinica:plantillas' %}">Plantillas de historia</a>: arma tu historia eligiendo secciones.</li>{% endif %}
+      </ul>
+    </div></div>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

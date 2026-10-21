@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% block contenido %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-1">
+  <h1 class="h3 mb-0">Plantillas de historia</h1>
+  <div class="d-flex gap-2">
+    <a href="{% url 'clinica:secciones' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-puzzle me-1"></i>Secciones</a>
+    <button class="btn btn-primary btn-sm" data-bs-toggle="collapse" data-bs-target="#nueva"><i class="bi bi-plus-lg me-1"></i>Nueva plantilla</button>
+  </div>
+</div>
+<p class="text-muted">Cada plantilla es una historia armada con secciones: las generales, las de tu especialidad y las que crees. Al abrir una consulta eliges la plantilla.</p>
+<div class="collapse mb-3" id="nueva">
+  <form method="post" action="{% url 'clinica:plantilla_nueva' %}" class="card card-body" style="max-width:760px">{% csrf_token %}
+    <div class="row g-2">
+      <div class="col-md-6">{% include 'partials/campo.html' with campo=form.nombre %}</div>
+      <div class="col-md-6">{% include 'partials/campo.html' with campo=form.especialidad %}</div>
+      <div class="col-md-6">{% include 'partials/campo.html' with campo=form.copiar_de %}</div>
+      {% if form.de_clinica %}<div class="col-md-6 pt-md-4">{% include 'partials/campo.html' with campo=form.de_clinica %}</div>{% endif %}
+    </div>
+    <div class="mt-2"><button class="btn btn-primary btn-sm">Crear</button></div>
+  </form>
+</div>
+{% regroup plantillas by especialidad as grupos %}
+{% for g in grupos %}
+  <h2 class="h6 text-uppercase text-muted mt-3">{{ g.grouper }}</h2>
+  <div class="row g-2">
+    {% for p in g.list %}
+      <div class="col-md-6 col-xl-4">
+        <a href="{% url 'clinica:plantilla' p.pk %}" class="card card-body h-100 text-decoration-none text-reset {% if not p.activa %}opacity-50{% endif %}">
+          <div class="d-flex justify-content-between align-items-start">
+            <div class="fw-semibold">{{ p.nombre }}</div>
+            <div>{% if p.es_predeterminada %}<span class="badge text-bg-primary">Predeterminada</span>{% endif %}{% if not p.activa %} <span class="badge text-bg-secondary">Inactiva</span>{% endif %}</div>
+          </div>
+          <div class="small text-muted">{{ p.n_secciones }} sección{{ p.n_secciones|pluralize:"es" }} · {% if p.profesional %}Mía{% else %}De la clínica{% endif %}{% if not p.editable %} · solo lectura{% endif %}</div>
+        </a>
+      </div>
+    {% endfor %}
+  </div>
+{% empty %}
+  <div class="card card-body text-muted">Aún no hay plantillas. Se crean solas al habilitar una especialidad o al agregar un profesional.</div>
+{% endfor %}
+{% endblock %}

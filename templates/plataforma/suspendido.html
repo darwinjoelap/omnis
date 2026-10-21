@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block titulo %}Acceso suspendido{% endblock %}
+{% block cuerpo %}
+<div class="om-pantalla-suelta"><div class="card shadow-sm"><div class="card-body p-4 text-center">
+  <img src="{% static 'img/marca/omnis-logo.png' %}" alt="Omnis" class="om-logo-login">
+  <h1 class="h5 mt-3">{{ tenant_marca.configuracion.nombre_display }}</h1>
+  <p class="text-muted mb-0">El acceso a este consultorio está suspendido temporalmente. Contacta al administrador de tu consultorio o a soporte de Omnis.</p>
+</div></div></div>
+{% endblock %}

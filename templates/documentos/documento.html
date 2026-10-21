@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block contenido %}
+<div class="d-flex flex-wrap gap-2 align-items-start mb-3">
+  <div class="me-auto">
+    <h1 class="h3 mb-0">{{ doc.definicion.nombre|default:doc.tipo }} <span class="text-muted">{{ doc.numero }}</span></h1>
+    <div class="small text-muted">{{ doc.paciente }} · {{ doc.fecha|date:"d/m/Y" }}{% if doc.profesional %} · {{ doc.profesional }}{% endif %}</div>
+    {% if doc.anulado %}<span class="badge text-bg-danger">Anulado: {{ doc.motivo_anulacion }}</span>{% endif %}
+  </div>
+  <a href="{% url 'documentos:pdf' doc.pk %}" target="_blank" data-pdf class="btn btn-primary btn-sm"><i class="bi bi-file-earmark-pdf me-1"></i>Abrir PDF</a>
+  {% if es_firmante %}<a href="{% url 'documentos:pdf' doc.pk %}?firma=0" target="_blank" data-pdf class="btn btn-outline-secondary btn-sm">Sin firma digital</a>{% endif %}
+  {% if doc.consulta %}<a href="{% url 'clinica:consulta' doc.consulta_id %}" class="btn btn-outline-secondary btn-sm">Ver consulta</a>{% endif %}
+  <a href="{% url 'pacientes:detalle' doc.paciente_id %}" class="btn btn-outline-secondary btn-sm">Ficha</a>
+</div>
+{% if doc.datos and doc.tipo != 'recibo' %}
+<div class="card mb-3" style="max-width: 760px"><div class="card-body small">
+  {% for clave, valor in doc.datos.items %}<div><span class="text-muted">{{ clave|capfirst }}:</span> {{ valor|linebreaksbr }}</div>{% endfor %}
+</div></div>
+{% endif %}
+{% if not doc.anulado %}{% if es_firmante or 'tenant.configurar' in permisos %}
+<form method="post" action="{% url 'documentos:anular' doc.pk %}" class="d-flex gap-2" style="max-width: 520px">{% csrf_token %}
+  <input name="motivo" class="form-control form-control-sm" placeholder="Motivo para anular" required minlength="3">
+  <button class="btn btn-outline-danger btn-sm text-nowrap">Anular documento</button>
+</form>
+{% endif %}{% endif %}
+{% endblock %}

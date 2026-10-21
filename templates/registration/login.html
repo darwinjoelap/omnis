@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block titulo %}Entrar{% endblock %}
+
+{% block cuerpo %}
+<div class="om-login">
+  <section class="om-login-marca" aria-label="Omnis">
+    <img src="{% static 'img/marca/omnis-logo.png' %}" alt="Omnis, tu consulta en un solo lugar" class="om-logo-login">
+    <div class="d-flex flex-column gap-2">
+      <p class="om-login-lema mb-0">Historias clínicas, agenda, cobros y documentos de tu consultorio.</p>
+      <p class="om-login-detalle text-muted mb-0">Instálala en tu teléfono desde el navegador y úsala como una app.</p>
+    </div>
+  </section>
+
+  <section class="om-login-formulario">
+    <div class="om-login-caja">
+      <div class="mb-4">
+        {% if tenant_marca %}
+          {% if tenant_marca.configuracion.logo %}<img src="{{ tenant_marca.configuracion.logo.url }}" alt="" class="mb-3" style="max-height:72px;max-width:200px">{% endif %}
+          <div class="om-eyebrow">Consultorio</div>
+          <h1 class="h3 mt-1 mb-1">{{ tenant_marca.configuracion.nombre_display }}</h1>
+          <p class="text-muted mb-0">Entra con tu usuario de este consultorio.</p>
+        {% else %}
+          <div class="om-eyebrow">Omnis</div>
+          <h1 class="h3 mt-1 mb-1">Entrar</h1>
+          <p class="text-muted mb-0">Gestión de consultas médicas.</p>
+        {% endif %}
+      </div>
+
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger py-2 small">Usuario o contraseña incorrectos.</div>
+      {% endif %}
+
+      <form method="post" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ next }}">
+        <div class="mb-3">
+          <label for="{{ form.username.id_for_label }}" class="form-label">{{ form.username.label }}</label>
+          {{ form.username }}
+        </div>
+        <div class="mb-4">
+          <label for="{{ form.password.id_for_label }}" class="form-label">{{ form.password.label }}</label>
+          {{ form.password }}
+        </div>
+        <button type="submit" class="btn btn-primary btn-lg w-100">Entrar</button>
+      </form>
+      {% if login_plataforma %}<p class="small text-muted mt-4 mb-0">¿Trabajas en un consultorio? Entra por el <b>enlace de tu consultorio</b> (ej. <code>/dra-perez/</code>).</p>{% endif %}
+      {% if tenant_marca %}<p class="small text-muted mt-4 mb-0">¿Olvidaste tu contraseña? Pídela al titular del consultorio.</p>{% endif %}
+    </div>
+  </section>
+</div>
+{% endblock %}

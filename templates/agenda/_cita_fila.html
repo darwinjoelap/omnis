@@ -1,0 +1,8 @@
+<a href="{% url 'agenda:cita' c.pk %}" class="list-group-item list-group-item-action d-flex gap-3 align-items-start {% if not c.activa and c.estado != 'ATENDIDA' %}text-muted{% endif %}" style="border-left:4px solid {{ c.tipo.color|default:c.profesional.color_agenda }}">
+  <div class="text-nowrap fw-semibold" style="min-width:4.8rem">{% if c.hora_inicio %}{{ c.hora_inicio|hora12 }}{% else %}<span class="badge text-bg-warning">Sin hora</span>{% endif %}</div>
+  <div class="flex-grow-1 min-w-0">
+    <div class="fw-semibold {% if c.estado == 'CANCELADA' %}text-decoration-line-through{% endif %}">{{ c.paciente.nombre_completo }}</div>
+    <div class="small text-muted text-truncate">{% if c.tipo %}{{ c.tipo }} · {% endif %}{{ c.motivo|default:"" }}{% if mostrar_profesional %} · {{ c.profesional }}{% endif %}{% if c.lugar %} · {{ c.lugar }}{% endif %}{% if c.sobrecupo %} · <b>sobrecupo</b>{% endif %}</div>
+  </div>
+  <span class="badge text-bg-{{ c.color }}">{{ c.get_estado_display }}</span>
+</a>

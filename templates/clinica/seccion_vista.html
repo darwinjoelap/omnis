@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block contenido %}
+<a href="{% url 'clinica:secciones' %}" class="small text-decoration-none"><i class="bi bi-arrow-left"></i> Secciones</a>
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mt-1 mb-3">
+  <div><h1 class="h4 mb-0">{{ seccion.nombre }}</h1>
+    <div class="small text-muted">{{ seccion.get_tipo_display }} · {{ seccion.get_ambito_display }}{% if seccion.especialidad %} · {{ seccion.especialidad }}{% endif %} · versión {{ seccion.version }}</div>
+    {% if seccion.descripcion %}<div class="small mt-1">{{ seccion.descripcion }}</div>{% endif %}</div>
+  {% if seccion.tipo == 'PERSONALIZADA' %}<a href="{% url 'clinica:seccion_editar' seccion.pk %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil me-1"></i>Editar</a>{% endif %}
+</div>
+<div class="card om-seccion {% if seccion.ambito == 'PACIENTE' %}om-ambito-paciente{% endif %}" data-seccion style="max-width:1000px">
+  <div class="card-header">{{ seccion.nombre }}</div>
+  <div class="card-body">{% include 'clinica/_seccion_form.html' with form=form %}</div>
+</div>
+{% endblock %}
+{% block extra_js %}<script src="{% static 'js/secciones.js' %}"></script>{% endblock %}

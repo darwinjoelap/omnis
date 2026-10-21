@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% block contenido %}
+<a href="{% url 'pacientes:detalle' paciente.pk %}" class="small text-decoration-none"><i class="bi bi-arrow-left"></i> {{ paciente }}</a>
+<form method="post" class="card card-body mt-2" style="max-width:760px">{% csrf_token %}
+  <h1 class="h5">Representante de {{ paciente.nombre_completo }}</h1>
+  <div class="row g-2">
+    <div class="col-md-6">{% include 'partials/campo.html' with campo=form.nombre %}</div>
+    <div class="col-md-6">{% include 'partials/campo.html' with campo=form.parentesco %}</div>
+    <div class="col-5 col-md-3">{% include 'partials/campo.html' with campo=form.tipo_documento %}</div>
+    <div class="col-7 col-md-3">{% include 'partials/campo.html' with campo=form.numero_documento %}</div>
+    <div class="col-md-6">{% include 'partials/campo.html' with campo=form.telefono %}</div>
+    <div class="col-md-6">{% include 'partials/campo.html' with campo=form.email %}</div>
+    <div class="col-md-6">{% include 'partials/campo.html' with campo=form.ocupacion %}</div>
+    <div class="col-12">{% include 'partials/campo.html' with campo=form.es_principal %}</div>
+  </div>
+  <div class="mt-3 d-flex gap-2"><button class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Guardar</button></div>
+</form>
+{% if form.instance.pk %}
+<form method="post" action="{% url 'pacientes:representante_eliminar' paciente.pk form.instance.pk %}" class="mt-2" onsubmit="return confirm('¿Eliminar este representante?')">{% csrf_token %}
+  <button class="btn btn-link text-danger btn-sm p-0">Eliminar representante</button></form>
+{% endif %}
+{% endblock %}

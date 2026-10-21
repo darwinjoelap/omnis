@@ -1,0 +1,45 @@
+{# Enlaces del menú principal: menú lateral (escritorio) y panel «Más» (móvil / app instalada) #}
+{% url 'core:inicio' as url_inicio %}
+{% with app=request.resolver_match.app_name nombre=request.resolver_match.url_name %}
+    <a href="{{ url_inicio }}" class="nav-link {% if request.path == url_inicio %}active{% endif %}"><i class="bi bi-house"></i> Inicio</a>
+    {% if user.is_superuser %}
+      <a href="{% url 'plataforma:lista' %}" class="nav-link {% if app == 'plataforma' %}active{% endif %}"><i class="bi bi-buildings"></i> Plataforma</a>
+    {% endif %}
+    {% if tenant %}
+    <div class="nav-seccion">Atención</div>
+    {% if 'pacientes.ver' in permisos %}
+      <a href="{% url 'pacientes:lista' %}" class="nav-link {% if app == 'pacientes' %}active{% endif %}"><i class="bi bi-people"></i> Pacientes</a>
+    {% endif %}
+    {% if 'agenda.ver' in permisos %}
+      <a href="{% url 'agenda:dia' %}" class="nav-link {% if app == 'agenda' and nombre in 'dia semana cita cita_nueva cita_editar' %}active{% endif %}"><i class="bi bi-calendar-week"></i> Agenda</a>
+    {% endif %}
+    {% if 'cobros.gestionar' in permisos %}
+      <a href="{% url 'cobros:caja' %}" class="nav-link {% if app == 'cobros' and nombre in 'caja cuenta' %}active{% endif %}"><i class="bi bi-cash-stack"></i> Caja</a>
+      <a href="{% url 'cobros:por_cobrar' %}" class="nav-link {% if app == 'cobros' and nombre == 'por_cobrar' %}active{% endif %}"><i class="bi bi-hourglass-split"></i> Por cobrar</a>
+    {% endif %}
+    {% if 'plantillas.propias' in permisos or 'plantillas.clinica' in permisos %}
+      <div class="nav-seccion">Historia clínica</div>
+      <a href="{% url 'clinica:plantillas' %}" class="nav-link {% if app == 'clinica' and 'plantilla' in nombre %}active{% endif %}"><i class="bi bi-ui-checks-grid"></i> Plantillas</a>
+      <a href="{% url 'clinica:secciones' %}" class="nav-link {% if app == 'clinica' and 'seccion' in nombre %}active{% endif %}"><i class="bi bi-puzzle"></i> Secciones</a>
+    {% endif %}
+    {% if 'tenant.configurar' in permisos or 'usuarios.gestionar' in permisos or 'servicios.gestionar' in permisos or 'agenda.gestionar' in permisos %}
+      <div class="nav-seccion">Consultorio</div>
+      {% if 'tenant.configurar' in permisos %}
+        <a href="{% url 'configuracion:editar' %}" class="nav-link {% if app == 'configuracion' and nombre == 'editar' %}active{% endif %}"><i class="bi bi-gear"></i> Configuración</a>
+        <a href="{% url 'configuracion:lugares' %}" class="nav-link {% if app == 'configuracion' and 'lugar' in nombre %}active{% endif %}"><i class="bi bi-geo-alt"></i> Lugares de consulta</a>
+      {% endif %}
+      {% if 'agenda.gestionar' in permisos %}
+        <a href="{% url 'agenda:horarios' %}" class="nav-link {% if app == 'agenda' and nombre in 'horarios tipos tipo_editar bloqueos' %}active{% endif %}"><i class="bi bi-clock"></i> Horarios y agenda</a>
+      {% endif %}
+      {% if 'usuarios.gestionar' in permisos %}
+        <a href="{% url 'equipo:lista' %}" class="nav-link {% if app == 'equipo' %}active{% endif %}"><i class="bi bi-person-badge"></i> Equipo</a>
+      {% endif %}
+      {% if 'servicios.gestionar' in permisos %}
+        <a href="{% url 'cobros:servicios' %}" class="nav-link {% if app == 'cobros' and 'servicio' in nombre %}active{% endif %}"><i class="bi bi-tags"></i> Servicios y precios</a>
+      {% endif %}
+      {% if 'tasa.cargar' in permisos %}
+        <a href="{% url 'tasas:tasa' %}" class="nav-link {% if app == 'tasas' %}active{% endif %}"><i class="bi bi-currency-exchange"></i> Tasa del día</a>
+      {% endif %}
+    {% endif %}
+    {% endif %}
+{% endwith %}

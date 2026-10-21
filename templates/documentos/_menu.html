@@ -1,0 +1,10 @@
+{% if opciones %}
+<div class="dropdown">
+  <button class="btn btn-outline-primary btn-sm dropdown-toggle" data-bs-toggle="dropdown" type="button"><i class="bi bi-file-earmark-medical me-1"></i>Documentos</button>
+  <ul class="dropdown-menu dropdown-menu-end">
+    {% for d in opciones %}
+      <li><a class="dropdown-item" href="{% url 'documentos:emitir' d.codigo %}?{% if consulta %}consulta={{ consulta.pk }}{% else %}paciente={{ paciente.pk }}{% endif %}"{% if not d.formulario %} target="_blank" data-pdf{% endif %}><i class="bi {{ d.icono }} me-2"></i>{{ d.nombre }}</a></li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}

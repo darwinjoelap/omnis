@@ -1,0 +1,18 @@
+<div class="card"><div class="table-responsive">
+  <table class="table align-middle mb-0 om-tabla">
+    <thead class="table-light"><tr><th>Paciente</th><th>Documento</th><th class="d-none d-md-table-cell">Edad</th><th class="d-none d-md-table-cell">Teléfono</th></tr></thead>
+    <tbody>
+    {% for p in pagina %}
+      <tr onclick="location.href='{% url 'pacientes:detalle' p.pk %}'" role="button">
+        <td><div class="fw-semibold">{{ p.apellidos }}, {{ p.nombres }}</div><div class="small text-muted d-md-none">{{ p.edad_texto }}</div></td>
+        <td class="small">{{ p.documento }}</td>
+        <td class="d-none d-md-table-cell small">{{ p.edad_texto|default:"—" }}</td>
+        <td class="d-none d-md-table-cell small">{{ p.telefono|default:"—" }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="4" class="text-center text-muted py-4">{% if q %}Ningún paciente coincide con «{{ q }}».{% if 'pacientes.gestionar' in permisos %} <a href="{% url 'pacientes:nuevo' %}">Registrarlo</a>{% endif %}{% else %}Aún no hay pacientes.{% endif %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div></div>
+{% include 'partials/paginacion.html' %}

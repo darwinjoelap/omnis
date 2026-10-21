@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+{% block contenido %}
+<a href="{% if cita %}{% url 'agenda:cita' cita.pk %}{% else %}{% url 'agenda:dia' %}{% endif %}" class="small text-decoration-none"><i class="bi bi-arrow-left"></i> {% if cita %}Cita{% else %}Agenda{% endif %}</a>
+<h1 class="h4 mt-1">{{ titulo }}</h1>
+<form method="post" class="card card-body" style="max-width:820px">{% csrf_token %}
+  {% for e in form.non_field_errors %}<div class="alert alert-danger py-1 small">{{ e }}</div>{% endfor %}
+  {{ form.paciente }}
+  <label class="form-label">Paciente <span class="text-danger">*</span></label>
+  <div id="paciente-elegido" class="mb-2 {% if not paciente %}d-none{% endif %}">
+    <span class="om-chip fs-6"><i class="bi bi-person"></i> <span id="paciente-nombre">{{ paciente.nombre_completo }}</span></span>
+    {% if not cita %}<button type="button" class="btn btn-link btn-sm" id="cambiar-paciente">Cambiar</button>{% endif %}
+  </div>
+  <div id="buscar-paciente" class="mb-3 {% if paciente %}d-none{% endif %}">
+    <input type="search" name="q" class="form-control" placeholder="Escribe nombre o cédula…" autocomplete="off"
+           hx-get="{% url 'pacientes:opciones' %}" hx-trigger="input changed delay:250ms" hx-target="#opciones-paciente">
+    <div id="opciones-paciente" class="mt-1"></div>
+    <a href="{% url 'pacientes:nuevo' %}?next={{ request.get_full_path|urlencode }}" class="small">+ Registrar paciente nuevo</a>
+    {% for e in form.paciente.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+  </div>
+  <div class="row g-2">
+    <div class="col-md-6 {% if form.solo_un_profesional %}d-none{% endif %}">{% include 'partials/campo.html' with campo=form.profesional %}</div>
+    <div class="col-md-6">{% include 'partials/campo.html' with campo=form.tipo %}</div>
+    <div class="col-6 col-md-3">{% include 'partials/campo.html' with campo=form.fecha %}</div>
+    <div class="col-6 col-md-3">{% include 'partials/campo.html' with campo=form.hora_inicio %}</div>
+    <div class="col-md-6">{% include 'partials/campo.html' with campo=form.lugar %}</div>
+    <div class="col-12">{% include 'partials/campo.html' with campo=form.motivo %}</div>
+    <div class="col-12">{% include 'partials/campo.html' with campo=form.notas %}</div>
+    <div class="col-12">{% include 'partials/campo.html' with campo=form.sobrecupo %}</div>
+  </div>
+  <div class="mt-3"><button class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Guardar cita</button></div>
+</form>
+{% endblock %}
+{% block extra_js %}
+<script>
+(function () {
+  const oculto = document.getElementById('id_paciente');
+  document.getElementById('opciones-paciente').addEventListener('click', function (e) {
+    const b = e.target.closest('[data-paciente]');
+    if (!b) return;
+    oculto.value = b.dataset.paciente;
+    document.getElementById('paciente-nombre').textContent = b.dataset.nombre;
+    document.getElementById('paciente-elegido').classList.remove('d-none');
+    document.getElementById('buscar-paciente').classList.add('d-none');
+  });
+  const cambiar = document.getElementById('cambiar-paciente');
+  if (cambiar) cambiar.addEventListener('click', function () {
+    oculto.value = '';
+    document.getElementById('paciente-elegido').classList.add('d-none');
+    document.getElementById('buscar-paciente').classList.remove('d-none');
+  });
+})();
+</script>
+{% endblock %}

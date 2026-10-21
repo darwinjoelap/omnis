@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block contenido %}
+<h1 class="h3 mb-2">Bloqueos y vacaciones</h1>
+{% include 'agenda/_submenu.html' %}
+<div class="row g-3">
+  <div class="col-lg-7"><div class="card"><ul class="list-group list-group-flush">
+    {% for b in bloqueos %}<li class="list-group-item d-flex justify-content-between align-items-center"><span><b>{{ b.motivo }}</b><br><span class="small text-muted">{{ b.desde|date:"d/m/Y H:i" }} – {{ b.hasta|date:"d/m/Y H:i" }} · {% if b.profesional %}{{ b.profesional }}{% else %}todo el consultorio{% endif %}</span></span>
+      <form method="post" action="{% url 'agenda:bloqueo_eliminar' b.pk %}">{% csrf_token %}<button class="btn btn-sm btn-outline-danger" aria-label="Eliminar"><i class="bi bi-x-lg"></i></button></form></li>
+    {% empty %}<li class="list-group-item small text-muted">Sin bloqueos vigentes.</li>{% endfor %}
+  </ul></div></div>
+  <div class="col-lg-5">
+    <form method="post" class="card card-body">{% csrf_token %}
+      <h2 class="h6">Nuevo bloqueo</h2>
+      <div class="row g-2">
+        <div class="col-12">{% include 'partials/campo.html' with campo=form.motivo %}</div>
+        <div class="col-12">{% include 'partials/campo.html' with campo=form.profesional %}</div>
+        <div class="col-md-6">{% include 'partials/campo.html' with campo=form.desde %}</div>
+        <div class="col-md-6">{% include 'partials/campo.html' with campo=form.hasta %}</div>
+      </div>
+      <div class="mt-2"><button class="btn btn-primary btn-sm">Bloquear</button></div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% block contenido %}
+<div class="d-flex flex-wrap gap-2 align-items-start mb-3">
+  <div class="me-auto">
+    <h1 class="h3 mb-0">Cuenta de {{ paciente }}</h1>
+    <a href="{% url 'pacientes:detalle' paciente.pk %}" class="small"><i class="bi bi-arrow-left"></i> Ficha del paciente</a>
+    {% if consulta %}<div class="small text-muted">Cobrando la consulta del {{ consulta.fecha|date:"d/m/Y" }} · {{ consulta.profesional }}</div>{% endif %}
+  </div>
+  <div class="text-end">
+    <div class="small text-muted">Saldo</div>
+    {% if saldo > 0 %}<div class="h4 mb-0 text-danger">Debe {{ saldo|usd }}</div>
+    {% elif saldo < 0 %}<div class="h4 mb-0 text-success">A favor {{ a_favor|usd }}</div>
+    {% else %}<div class="h4 mb-0 text-success">Al día</div>{% endif %}
+    {% if tasa and saldo > 0 %}<div class="small text-muted">{{ saldo|bs:tasa.bs_por_usd }} a la tasa de hoy</div>{% endif %}
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-5 order-lg-2">
+    <form method="post" class="card card-body mb-3">{% csrf_token %}
+      <input type="hidden" name="accion" value="cargo">{% if consulta %}<input type="hidden" name="consulta" value="{{ consulta.pk }}">{% endif %}
+      <h2 class="h6"><i class="bi bi-receipt me-1"></i>Agregar cargo</h2>
+      <div class="row g-2">
+        <div class="col-12">{% include 'partials/campo.html' with campo=form_cargo.servicio %}</div>
+        <div class="col-12">{% include 'partials/campo.html' with campo=form_cargo.descripcion %}</div>
+        <div class="col-6">{% include 'partials/campo.html' with campo=form_cargo.precio_usd %}</div>
+        <div class="col-6">{% include 'partials/campo.html' with campo=form_cargo.descuento_usd %}</div>
+        <div class="col-12">{% include 'partials/campo.html' with campo=form_cargo.exonerado %}</div>
+      </div>
+      <div class="mt-2"><button class="btn btn-outline-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Agregar cargo</button></div>
+    </form>
+    <form method="post" class="card card-body">{% csrf_token %}
+      <input type="hidden" name="accion" value="pago">
+      <h2 class="h6"><i class="bi bi-cash-coin me-1"></i>Registrar pago</h2>
+      {% if not tasa %}<div class="alert alert-warning small py-2">No hay tasa del día: solo se pueden registrar pagos en dólares.</div>{% endif %}
+      <div class="row g-2">
+        <div class="col-6">{% include 'partials/campo.html' with campo=form_pago.monto %}</div>
+        <div class="col-6">{% include 'partials/campo.html' with campo=form_pago.moneda %}</div>
+        <div class="col-6">{% include 'partials/campo.html' with campo=form_pago.metodo %}</div>
+        <div class="col-6">{% include 'partials/campo.html' with campo=form_pago.referencia %}</div>
+        <div class="col-12">{% include 'partials/campo.html' with campo=form_pago.notas %}</div>
+      </div>
+      <div class="mt-2"><button class="btn btn-primary btn-sm"><i class="bi bi-check2 me-1"></i>Registrar pago</button></div>
+    </form>
+  </div>
+
+  <div class="col-lg-7 order-lg-1">
+    <div class="card mb-3">
+      <div class="card-header bg-white fw-semibold">Cargos <span class="text-muted small fw-normal">· total {{ total_cargos|usd }}</span></div>
+      <div class="table-responsive"><table class="table align-middle mb-0 om-tabla">
+        <thead class="table-light"><tr><th>Fecha</th><th>Concepto</th><th class="text-end">Monto</th><th class="text-end">Saldo</th><th></th></tr></thead>
+        <tbody>{% for c in cargos %}
+          <tr class="{% if c.estado == 'ANULADO' %}text-muted text-decoration-line-through{% endif %}">
+            <td data-label="Fecha">{{ c.fecha|date:"d/m/Y" }}</td>
+            <td data-label="Concepto">{{ c.descripcion }}
+              <div class="small text-muted">{% if c.profesional %}{{ c.profesional }} · {% endif %}{% if c.exonerado %}Exonerado · {% endif %}{% if c.descuento_usd %}Desc. {{ c.descuento_usd|usd }} · {% endif %}<span class="badge {% if c.estado == 'PAGADO' %}text-bg-success{% elif c.estado == 'PARCIAL' %}text-bg-info{% elif c.estado == 'ANULADO' %}text-bg-secondary{% else %}text-bg-warning{% endif %}">{{ c.get_estado_display }}</span></div></td>
+            <td data-label="Monto" class="text-end">{{ c.monto_usd|usd }}{% if c.monto_bs %}<div class="small text-muted">{{ c.monto_bs|bs }}</div>{% endif %}</td>
+            <td data-label="Saldo" class="text-end">{{ c.saldo_usd|usd }}</td>
+            <td class="text-end">{% if c.estado == 'PENDIENTE' %}
+              <form method="post" action="{% url 'cobros:cargo_anular' c.pk %}" onsubmit="var m=prompt('Motivo de la anulación');if(!m)return false;this.motivo.value=m;">{% csrf_token %}<input type="hidden" name="motivo"><button class="btn btn-link btn-sm text-danger p-0" title="Anular cargo"><i class="bi bi-x-circle"></i></button></form>{% endif %}</td>
+          </tr>
+        {% empty %}<tr><td colspan="5" class="text-muted text-center py-3">Sin cargos.</td></tr>{% endfor %}</tbody>
+      </table></div>
+    </div>
+    <div class="card">
+      <div class="card-header bg-white fw-semibold">Pagos <span class="text-muted small fw-normal">· total {{ total_pagos|usd }}</span></div>
+      <div class="table-responsive"><table class="table align-middle mb-0 om-tabla">
+        <thead class="table-light"><tr><th>Fecha</th><th>Método</th><th class="text-end">Monto</th><th class="text-end">USD</th><th></th></tr></thead>
+        <tbody>{% for p in pagos %}
+          <tr class="{% if p.anulado %}text-muted text-decoration-line-through{% endif %}">
+            <td data-label="Fecha">{{ p.fecha|date:"d/m/Y" }}</td>
+            <td data-label="Método">{{ p.get_metodo_display }}{% if p.referencia %} · {{ p.referencia }}{% endif %}
+              {% if p.anulado %}<div class="small">Anulado: {{ p.motivo_anulacion }}</div>{% endif %}</td>
+            <td data-label="Monto" class="text-end">{% if p.moneda == 'BS' %}{{ p.monto|bs }}<div class="small text-muted">tasa {{ p.tasa|floatformat:"2g" }}</div>{% else %}{{ p.monto|usd }}{% endif %}</td>
+            <td data-label="USD" class="text-end">{{ p.monto_usd|usd }}</td>
+            <td class="text-end text-nowrap"><a href="{% url 'documentos:recibo' p.pk %}" target="_blank" data-pdf class="btn btn-link btn-sm p-0 me-2" title="Recibo"><i class="bi bi-receipt"></i></a>{% if not p.anulado %}
+              <form method="post" class="d-inline" action="{% url 'cobros:pago_anular' p.pk %}" onsubmit="var m=prompt('Motivo de la anulación');if(!m)return false;this.motivo.value=m;">{% csrf_token %}<input type="hidden" name="motivo"><button class="btn btn-link btn-sm text-danger p-0" title="Anular pago"><i class="bi bi-x-circle"></i></button></form>{% endif %}</td>
+          </tr>
+        {% empty %}<tr><td colspan="5" class="text-muted text-center py-3">Sin pagos.</td></tr>{% endfor %}</tbody>
+      </table></div>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  var precios = {{ precios|safe }}, sel = document.getElementById('id_servicio'), precio = document.getElementById('id_precio_usd');
+  if (sel && precio) sel.addEventListener('change', function () { if (precios[sel.value]) precio.value = precios[sel.value]; });
+})();
+</script>
+{% endblock %}

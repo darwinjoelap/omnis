@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block contenido %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <h1 class="h3 mb-0">Pacientes</h1>
+  {% if 'pacientes.gestionar' in permisos %}<a href="{% url 'pacientes:nuevo' %}" class="btn btn-primary btn-sm"><i class="bi bi-person-plus me-1"></i>Nuevo paciente</a>{% endif %}
+</div>
+<form method="get" class="d-flex flex-wrap gap-2 align-items-center mb-3">
+  <input type="search" name="q" value="{{ q }}" class="form-control" style="max-width:520px" aria-label="Buscar paciente" placeholder="Nombre, apellido o número de cédula" autocomplete="off" autofocus
+         hx-get="{% url 'pacientes:lista' %}" hx-include="[name=ver]" hx-trigger="input changed delay:300ms, search" hx-target="#resultados" hx-push-url="true">
+  <input type="hidden" name="ver" value="{{ alcance }}">
+  {% if es_profesional and puede_ver_todos %}
+    <div class="btn-group" role="group" aria-label="Qué pacientes ver">
+      <a href="?ver=mios{% if q %}&q={{ q|urlencode }}{% endif %}" class="btn btn-sm {% if alcance == 'mios' %}btn-primary{% else %}btn-outline-secondary{% endif %}">Mis pacientes</a>
+      <a href="?ver=todos{% if q %}&q={{ q|urlencode }}{% endif %}" class="btn btn-sm {% if alcance == 'todos' %}btn-primary{% else %}btn-outline-secondary{% endif %}">Todos</a>
+    </div>
+  {% endif %}
+</form>
+{% if alcance == 'mios' and not puede_ver_todos %}<p class="small text-muted">Ves tus pacientes (los que atendiste, tienes citados o registraste) y los nuevos sin historia. Para atender a un paciente de otro médico, pide que te lo citen.</p>{% endif %}
+<div id="resultados">{% include 'pacientes/_resultados.html' %}</div>
+{% endblock %}

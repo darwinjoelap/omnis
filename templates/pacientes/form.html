@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+{% block contenido %}
+<a href="{% if paciente %}{% url 'pacientes:detalle' paciente.pk %}{% else %}{% url 'pacientes:lista' %}{% endif %}" class="small text-decoration-none"><i class="bi bi-arrow-left"></i> {% if paciente %}{{ paciente }}{% else %}Pacientes{% endif %}</a>
+<h1 class="h3 mt-1 mb-3">{% if nuevo %}Nuevo paciente{% else %}Editar datos del paciente{% endif %}</h1>
+{% if duplicado %}
+  <div class="alert alert-warning d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span><i class="bi bi-person-exclamation me-1"></i>Este paciente ya está registrado: <b>{{ duplicado.nombre_completo }}</b> ({{ duplicado.documento }}{% if duplicado.fecha_nacimiento %}, {{ duplicado.edad_texto }}{% endif %}).</span>
+    <a href="{% url 'pacientes:detalle' duplicado.pk %}" class="btn btn-sm btn-warning">Abrir su ficha</a>
+  </div>
+{% endif %}
+<form method="post" style="max-width:1000px">{% csrf_token %}
+  <input type="hidden" name="next" value="{{ next }}">
+  {% for e in form.non_field_errors %}<div class="alert alert-danger py-2">{{ e }}</div>{% endfor %}
+  <div class="card card-body mb-3">
+    <h2 class="h6">Identificación</h2>
+    <div class="row g-2">
+      <div class="col-md-6">{% include 'partials/campo.html' with campo=form.nombres %}</div>
+      <div class="col-md-6">{% include 'partials/campo.html' with campo=form.apellidos %}</div>
+      <div class="col-6 col-md-3">{% include 'partials/campo.html' with campo=form.sexo %}</div>
+      <div class="col-6 col-md-3">{% include 'partials/campo.html' with campo=form.fecha_nacimiento %}</div>
+      <div class="col-5 col-md-2">{% include 'partials/campo.html' with campo=form.tipo_documento %}</div>
+      <div class="col-7 col-md-4">{% include 'partials/campo.html' with campo=form.numero_documento %}</div>
+    </div>
+  </div>
+  <div class="card card-body mb-3">
+    <h2 class="h6">Contacto</h2>
+    <div class="row g-2">
+      <div class="col-md-4">{% include 'partials/campo.html' with campo=form.telefono %}</div>
+      <div class="col-md-4">{% include 'partials/campo.html' with campo=form.telefono_2 %}</div>
+      <div class="col-md-4">{% include 'partials/campo.html' with campo=form.email %}</div>
+      <div class="col-md-8">{% include 'partials/campo.html' with campo=form.direccion %}</div>
+      <div class="col-md-4">{% include 'partials/campo.html' with campo=form.ciudad %}</div>
+      <div class="col-md-6">{% include 'partials/campo.html' with campo=form.contacto_emergencia %}</div>
+      <div class="col-md-6">{% include 'partials/campo.html' with campo=form.referido_por %}</div>
+    </div>
+  </div>
+  <div class="card card-body mb-3">
+    <h2 class="h6">Otros datos</h2>
+    <div class="row g-2">
+      <div class="col-md-4">{% include 'partials/campo.html' with campo=form.ocupacion %}</div>
+      <div class="col-md-3">{% include 'partials/campo.html' with campo=form.estado_civil %}</div>
+      <div class="col-md-2">{% include 'partials/campo.html' with campo=form.grupo_sanguineo %}</div>
+      <div class="col-md-3">{% include 'partials/campo.html' with campo=form.seguro %}</div>
+      <div class="col-12">{% include 'partials/campo.html' with campo=form.observaciones %}</div>
+    </div>
+  </div>
+  {% if form_rep %}
+  <div class="card card-body mb-3" id="bloque-representante">
+    <h2 class="h6 mb-1">Representante</h2>
+    <p class="small text-muted mb-2">Obligatorio para menores sin documento (con su cédula). Opcional en los demás casos.</p>
+    <div class="row g-2">
+      <div class="col-md-5">{% include 'partials/campo.html' with campo=form_rep.nombre %}</div>
+      <div class="col-md-3">{% include 'partials/campo.html' with campo=form_rep.parentesco %}</div>
+      <div class="col-5 col-md-2">{% include 'partials/campo.html' with campo=form_rep.tipo_documento %}</div>
+      <div class="col-7 col-md-2">{% include 'partials/campo.html' with campo=form_rep.numero_documento %}</div>
+      <div class="col-md-4">{% include 'partials/campo.html' with campo=form_rep.telefono %}</div>
+      <div class="col-md-4">{% include 'partials/campo.html' with campo=form_rep.email %}</div>
+      <div class="col-md-4">{% include 'partials/campo.html' with campo=form_rep.ocupacion %}</div>
+    </div>
+  </div>
+  {% if 'historia.ver' in permisos %}
+  <div class="card card-body mb-3">
+    <h2 class="h6">Alergias</h2>
+    <textarea name="alergias" rows="1" class="form-control" placeholder="Vacío = no conocidas">{{ request.POST.alergias }}</textarea>
+  </div>
+  {% endif %}
+  {% endif %}
+  <button class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Guardar</button>
+</form>
+{% endblock %}

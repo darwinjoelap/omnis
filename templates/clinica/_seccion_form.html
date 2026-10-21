@@ -1,0 +1,38 @@
+{# Formulario de una sección clínica construido desde su esquema. Recibe: form (FormularioSeccion) #}
+{% for e in form.non_field_errors %}<div class="alert alert-danger py-1 small">{{ e }}</div>{% endfor %}
+<div class="row g-2">
+{% for it in form.items %}
+  {% with c=it.def %}
+  {% if c.tipo == 'subtitulo' %}
+    <div class="col-12"><div class="om-subtitulo">{{ c.etiqueta }}</div></div>
+  {% elif c.tipo == 'calculado' %}
+    <div class="col-6 col-md-{{ it.ancho }}" data-campo="{{ c.clave }}">
+      <label class="form-label">{{ c.etiqueta }}</label>
+      <input class="form-control om-calculado" value="{% if form.datos_limpios %}{{ form.datos_limpios|obtener:c.clave|default_if_none:'' }}{% endif %}" placeholder="Se calcula al guardar" disabled>
+    </div>
+  {% elif c.tipo == 'tabla' %}
+    <div class="col-12" data-campo="{{ c.clave }}">
+      <label class="form-label">{{ c.etiqueta }}{% if c.requerido %} <span class="text-danger">*</span>{% endif %}</label>
+      <div class="table-responsive"><table class="table table-sm om-tabla-campos mb-1">
+        <thead><tr>{% for sub, campo in it.filas.0 %}<th>{{ sub.etiqueta }}</th>{% endfor %}</tr></thead>
+        <tbody id="tabla-{{ form.prefix }}-{{ c.clave }}">
+          {% for fila in it.filas %}<tr>{% for sub, campo in fila %}<td>{{ campo }}</td>{% endfor %}</tr>{% endfor %}
+        </tbody>
+      </table></div>
+      <button type="button" class="btn btn-link btn-sm p-0" data-agregar-fila="tabla-{{ form.prefix }}-{{ c.clave }}"><i class="bi bi-plus-lg"></i> Agregar fila</button>
+      {% if c.ayuda %}<div class="form-text">{{ c.ayuda }}</div>{% endif %}
+      {% for campo_err, errores in form.errors.items %}{% if campo_err == c.clave %}{% for e in errores %}<div class="text-danger small">{{ e }}</div>{% endfor %}{% endif %}{% endfor %}
+    </div>
+  {% elif it.campo %}
+    {% with campo=it.campo w=it.campo.field.widget.input_type %}
+    <div class="{% if it.ancho == 12 %}col-12{% else %}col-{% if it.ancho <= 3 %}6{% else %}12{% endif %} col-md-{{ it.ancho }}{% endif %}" data-campo="{{ c.clave }}">
+      <label class="form-label" for="{{ campo.id_for_label }}">{{ c.etiqueta }}{% if c.unidad %} <span class="om-unidad">({{ c.unidad }})</span>{% endif %}{% if c.requerido %} <span class="text-danger">*</span>{% endif %}</label>
+      {% if w == 'radio' or w == 'checkbox' %}<div class="om-radios">{{ campo }}</div>{% else %}{{ campo }}{% endif %}
+      {% if c.ayuda %}<div class="form-text">{{ c.ayuda }}</div>{% endif %}
+      {% for e in campo.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+    </div>
+    {% endwith %}
+  {% endif %}
+  {% endwith %}
+{% endfor %}
+</div>

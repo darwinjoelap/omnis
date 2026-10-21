@@ -1,0 +1,22 @@
+from django.urls import path
+
+from . import views
+
+app_name = 'agenda'
+
+urlpatterns = [
+    path('', views.dia, name='dia'),
+    path('semana/', views.semana, name='semana'),
+    path('citas/nueva/', views.cita_form, name='cita_nueva'),
+    path('citas/<int:pk>/', views.cita, name='cita'),
+    path('citas/<int:pk>/editar/', views.cita_form, name='cita_editar'),
+    path('citas/<int:pk>/estado/', views.cita_estado, name='cita_estado'),
+    path('citas/<int:pk>/atender/', views.atender, name='atender'),
+    path('citas/<int:pk>/recordatorio/', views.recordatorio, name='recordatorio'),
+    path('horarios/', views.horarios, name='horarios'),
+    path('horarios/<int:pk>/eliminar/', views.horario_eliminar, name='horario_eliminar'),
+    path('tipos/', views.tipos, name='tipos'),
+    path('tipos/<int:pk>/', views.tipos, name='tipo_editar'),
+    path('bloqueos/', views.bloqueos, name='bloqueos'),
+    path('bloqueos/<int:pk>/eliminar/', views.bloqueo_eliminar, name='bloqueo_eliminar'),
+]
