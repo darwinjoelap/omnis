@@ -203,7 +203,7 @@ def bloqueos(request):
         return redirect('agenda:bloqueos')
     return render(request, 'agenda/bloqueos.html', {
         'titulo': 'Bloqueos de agenda', 'form': form,
-        'bloqueos': Bloqueo.objects.filter(hasta__gte=srv.hoy()).select_related('profesional__membresia__usuario')})
+        'bloqueos': Bloqueo.objects.filter(hasta__date__gte=srv.hoy()).select_related('profesional__membresia__usuario')}
 
 
 @login_required
