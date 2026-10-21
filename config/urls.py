@@ -4,6 +4,24 @@ from django.urls import include, path
 
 from apps.plataforma.views_entrada import entrada
 
+
+def urls_de_especialidades():
+    """Cada módulo de especialidad con `urls.py` queda en /esp/<código>/ (sin tocar este archivo)."""
+    import importlib
+
+    from apps.clinica import registro
+    rutas = []
+    for codigo, esp in sorted(registro.especialidades().items()):
+        if not esp.modulo:
+            continue
+        try:
+            importlib.import_module(f'{esp.modulo}.urls')
+        except ModuleNotFoundError:
+            continue
+        rutas.append(path(f'esp/{codigo}/', include(f'{esp.modulo}.urls')))
+    return rutas
+
+
 admin.site.site_header = 'Omnis — administración'
 admin.site.site_title = 'Omnis'
 
@@ -20,6 +38,7 @@ urlpatterns = [
     path('offline/', include('apps.offline.urls')),
     path('pacientes/', include('apps.pacientes.urls')),
     path('agenda/', include('apps.agenda.urls')),
+    *urls_de_especialidades(),
     path('', include('apps.clinica.urls')),
     path('', include('apps.core.urls')),
 ]

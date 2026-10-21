@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block contenido %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-1">
+  <h1 class="h3 mb-0">Glosario de medicamentos</h1>
+  <a href="{% url 'clinica:medicamento_nuevo' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Nuevo medicamento</a>
+</div>
+<p class="text-muted">Tus medicamentos frecuentes con su dosis. En la consulta, «Del glosario» calcula la dosis con el peso y la edad del paciente y llena la fila del récipe.</p>
+<div class="mb-2"><input type="search" class="form-control form-control-sm" style="max-width:320px" placeholder="Buscar…" data-filtro-tabla="tabla-meds" aria-label="Buscar medicamento"></div>
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0" id="tabla-meds">
+      <thead><tr><th>Medicamento</th><th>Cálculo</th><th class="d-none d-md-table-cell">Frecuencia</th><th class="d-none d-md-table-cell">De</th><th></th></tr></thead>
+      <tbody>
+      {% for m in medicamentos %}
+        <tr class="{% if not m.activo %}opacity-50{% endif %}">
+          <td><a href="{% url 'clinica:medicamento' m.pk %}" class="fw-semibold">{{ m.nombre }}</a><div class="small text-muted">{{ m.presentacion }}</div></td>
+          <td class="small">{% if m.modo == 'PESO' %}{{ m.dosis_kg_min }}{% if m.dosis_kg_max %}–{{ m.dosis_kg_max }}{% endif %} {{ m.unidad_kg }}/kg{% elif m.modo == 'FIJA' %}{{ m.dosis_fija }}{% else %}Por edad ({{ m.rangos_edad|length }} rango{{ m.rangos_edad|length|pluralize }}){% endif %}</td>
+          <td class="small d-none d-md-table-cell">{% if m.frecuencia_horas %}c/{{ m.frecuencia_horas }} h{% endif %}{% if m.duracion_dias %} · {{ m.duracion_dias }} d{% endif %}</td>
+          <td class="small d-none d-md-table-cell">{% if m.profesional_id %}Mío{% else %}Consultorio{% endif %}</td>
+          <td class="text-end"><form method="post" action="{% url 'clinica:medicamento_activar' m.pk %}">{% csrf_token %}<button class="btn btn-link btn-sm p-0">{% if m.activo %}Desactivar{% else %}Activar{% endif %}</button></form></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5" class="text-muted p-3">Aún no hay medicamentos. Agrega los que más indicas.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<script>
+document.querySelectorAll('[data-filtro-tabla]').forEach(function (inp) {
+  inp.addEventListener('input', function () {
+    var q = inp.value.toLowerCase();
+    document.querySelectorAll('#' + inp.dataset.filtroTabla + ' tbody tr').forEach(function (tr) {
+      tr.hidden = q && tr.textContent.toLowerCase().indexOf(q) < 0;
+    });
+  });
+});
+</script>
+{% endblock %}

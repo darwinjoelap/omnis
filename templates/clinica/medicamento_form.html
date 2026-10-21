@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block contenido %}
+<a href="{% url 'clinica:medicamentos' %}" class="small text-decoration-none"><i class="bi bi-arrow-left"></i> Glosario</a>
+<h1 class="h3 mb-3">{{ titulo }}</h1>
+<form method="post" class="card card-body" style="max-width:860px" id="form-med">{% csrf_token %}
+  {% for e in form.non_field_errors %}<div class="alert alert-danger py-1 small">{{ e }}</div>{% endfor %}
+  <div class="row g-2">
+    <div class="col-md-6">{% include 'partials/campo.html' with campo=form.nombre %}</div>
+    <div class="col-md-6">{% include 'partials/campo.html' with campo=form.presentacion %}</div>
+    <div class="col-md-4">{% include 'partials/campo.html' with campo=form.modo %}</div>
+  </div>
+  <fieldset class="row g-2 mt-1" data-modo="PESO">
+    <legend class="h6 text-muted mt-2">Dosis por peso</legend>
+    <div class="col-6 col-md-3">{% include 'partials/campo.html' with campo=form.dosis_kg_min %}</div>
+    <div class="col-6 col-md-3">{% include 'partials/campo.html' with campo=form.dosis_kg_max %}</div>
+    <div class="col-6 col-md-3">{% include 'partials/campo.html' with campo=form.unidad_kg %}</div>
+    <div class="col-6 col-md-3">{% include 'partials/campo.html' with campo=form.dosis_max %}</div>
+    <div class="col-6 col-md-3">{% include 'partials/campo.html' with campo=form.concentracion_mg %}</div>
+    <div class="col-6 col-md-3">{% include 'partials/campo.html' with campo=form.volumen_ml %}</div>
+    <div class="col-6 col-md-3">{% include 'partials/campo.html' with campo=form.unidad_resultado %}</div>
+    <div class="col-12 small text-muted">Ej.: acetaminofén 10–15 mg/kg, jarabe 160 mg / 5 mL, resultado en mL, tope 1000 mg.</div>
+  </fieldset>
+  <fieldset class="row g-2 mt-1" data-modo="FIJA">
+    <legend class="h6 text-muted mt-2">Dosis fija</legend>
+    <div class="col-md-6">{% include 'partials/campo.html' with campo=form.dosis_fija %}</div>
+  </fieldset>
+  <fieldset class="row g-2 mt-1" data-modo="EDAD">
+    <legend class="h6 text-muted mt-2">Dosis por edad</legend>
+    <div class="col-md-8">{% include 'partials/campo.html' with campo=form.rangos %}</div>
+  </fieldset>
+  <div class="row g-2 mt-1">
+    <div class="col-6 col-md-3">{% include 'partials/campo.html' with campo=form.frecuencia_horas %}</div>
+    <div class="col-6 col-md-3">{% include 'partials/campo.html' with campo=form.duracion_dias %}</div>
+    <div class="col-12">{% include 'partials/campo.html' with campo=form.indicaciones %}</div>
+    <div class="col-4 col-md-3">{% include 'partials/campo.html' with campo=form.edad_min_meses %}</div>
+    <div class="col-4 col-md-3">{% include 'partials/campo.html' with campo=form.edad_max_meses %}</div>
+    <div class="col-4 col-md-3">{% include 'partials/campo.html' with campo=form.peso_min_kg %}</div>
+    <div class="col-md-6">{% include 'partials/campo.html' with campo=form.solo_mio %}</div>
+    <div class="col-md-6">{% include 'partials/campo.html' with campo=form.activo %}</div>
+  </div>
+  <div class="mt-3"><button class="btn btn-primary">Guardar</button></div>
+</form>
+{% if prueba %}
+<div class="card card-body mt-3" style="max-width:860px">
+  <h2 class="h6">Prueba del cálculo</h2>
+  <table class="table table-sm mb-0"><thead><tr><th>Ejemplo</th><th>Dosis</th><th>Indicación</th></tr></thead><tbody>
+  {% for peso, r in prueba %}<tr><td>{{ peso }} kg</td><td>{{ r.dosis|default:'—' }}{% if r.dosis_mg and r.dosis_mg != r.dosis %} <span class="text-muted small">({{ r.dosis_mg }})</span>{% endif %}</td><td class="small">{{ r.texto }}{% for a in r.alertas %}<div class="text-{{ a.tipo }}">{{ a.msg }}</div>{% endfor %}</td></tr>{% endfor %}
+  </tbody></table>
+</div>
+{% endif %}
+<script>
+(function () {
+  var modo = document.querySelector('#form-med [name=modo]');
+  function mostrar() { document.querySelectorAll('[data-modo]').forEach(function (f) { f.hidden = f.dataset.modo !== modo.value; }); }
+  modo.addEventListener('change', mostrar); mostrar();
+})();
+</script>
+{% endblock %}

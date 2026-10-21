@@ -503,3 +503,14 @@ textarea.form-control { min-height: auto; }
 .om-hora-ocupada { background: var(--om-arena-100, #F1EADF); color: #5E4A33; }
 .om-hora-pasada { color: #9AA5A2; background: #F5F3EE; text-decoration: line-through; }
 
+/* Pediatría: curvas de crecimiento y chips */
+.om-curva { width: 100%; height: auto; display: block; }
+.om-curva-eje { font-size: 11px; fill: #55625F; font-family: Inter, system-ui, sans-serif; }
+.om-curva-p { font-size: 10px; font-weight: 600; font-family: Inter, system-ui, sans-serif; }
+.om-curva circle { cursor: pointer; }
+.om-chip-ok { background: var(--om-salvia-100, #E4EFE8); color: var(--om-petroleo-900, #1F403D); }
+.om-chip-estado { background: var(--om-arena-100, #F1EADF); color: #5E4A33; font-weight: 600; }
+
+
+/* Glosario en el récipe */
+.om-glosario { background: var(--om-crema, #F7F4EE); border: 1px dashed #D9D2C3; }

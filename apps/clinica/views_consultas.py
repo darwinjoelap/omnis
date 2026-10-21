@@ -130,7 +130,7 @@ def nueva(request, paciente_pk):
     return render(request, 'clinica/consulta_form.html', {
         'titulo': f'Nueva consulta · {paciente}', 'consulta': consulta, 'formularios': formularios, 'nueva': True,
         'cita': cita, 'previas': consultas_visibles(request, paciente)[:5],
-        'antecedentes': getattr(paciente, 'antecedentes', None), 'faltan': []})
+        'antecedentes': getattr(paciente, 'antecedentes', None), 'faltan': [], **_glosario(request, paciente)})
 
 
 @login_required
@@ -163,7 +163,8 @@ def editar(request, pk):
     antecedentes = getattr(consulta.paciente, 'antecedentes', None)
     return render(request, 'clinica/consulta_form.html', {
         'titulo': f'Consulta · {consulta.paciente}', 'consulta': consulta, 'formularios': formularios,
-        'previas': previas, 'antecedentes': antecedentes, 'faltan': srv.faltantes(consulta)})
+        'previas': previas, 'antecedentes': antecedentes, 'faltan': srv.faltantes(consulta),
+        **_glosario(request, consulta.paciente)})
 
 
 @login_required
@@ -278,3 +279,46 @@ def cie10(request):
         opciones = qs[:20]
     return HttpResponse(format_html_join('', '<option value="{} · {}"></option>',
                                          ((c.codigo, c.descripcion) for c in opciones)))
+
+
+@login_required
+@requiere('historia.ver')
+def ficha_especialidad(request, paciente_pk, codigo):
+    """Ficha de la especialidad del paciente (p. ej. ficha pediátrica) fuera de la consulta, como en Pediae."""
+    from apps.pacientes.selectors import puede_ver_paciente
+    from apps.plataforma.models import Especialidad
+    paciente = get_object_or_404(Paciente.objects.all(), pk=paciente_pk)
+    if not puede_ver_paciente(request.membresia, paciente):
+        raise PermissionDenied
+    especialidad = get_object_or_404(Especialidad.objects.filter(activa=True), codigo=codigo)
+    items = srv.items_ficha(codigo)
+    if not items:
+        raise Http404
+    puede_editar = request.membresia.perfil_activo is not None
+    guardados = srv.datos_ficha(paciente, items)
+    datos = request.POST if request.method == 'POST' and puede_editar else None
+    formularios = [(i, FormularioSeccion(i['campos'], datos, initial=guardados.get(i['seccion_id']) or {},
+                                         prefix=f's{i["seccion_id"]}', exigir_requeridos=False)) for i in items]
+    if datos is not None:
+        if all(f.is_valid() for _, f in formularios):
+            srv.guardar_ficha(paciente, items, {i['seccion_id']: f.datos_limpios for i, f in formularios})
+            auditoria.registrar(request, 'EDITAR', paciente, paciente_id=paciente.pk,
+                                detalle=f'Ficha de {especialidad.nombre}')
+            messages.success(request, f'Ficha de {especialidad.nombre.lower()} guardada.')
+            return redirect('pacientes:detalle', pk=paciente.pk)
+        messages.error(request, 'Revisa los campos marcados en rojo; no se guardó nada.')
+    else:
+        auditoria.registrar(request, 'VER', paciente, paciente_id=paciente.pk, detalle=f'Ficha de {especialidad.nombre}')
+    return render(request, 'clinica/ficha_especialidad.html', {
+        'titulo': f'Ficha de {especialidad.nombre.lower()} · {paciente}', 'paciente': paciente,
+        'especialidad': especialidad, 'formularios': formularios, 'puede_editar': puede_editar})
+
+
+def _glosario(request, paciente):
+    """Medicamentos activos del glosario y edad en meses para la calculadora de dosis del récipe."""
+    from apps.core.fechas import edad_meses
+
+    from .views_medicamentos import visibles
+    meds = visibles(request).filter(activo=True).order_by('nombre').only('pk', 'nombre', 'presentacion')
+    return {'glosario': list(meds),
+            'edad_meses': edad_meses(paciente.fecha_nacimiento) if paciente.fecha_nacimiento else ''}

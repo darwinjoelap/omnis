@@ -13,6 +13,7 @@
   </div>
 </div>
 
+{% if reportes_especialidad %}<div class="d-flex flex-wrap gap-2 mb-3">{% for r in reportes_especialidad %}<a href="{% url r.url %}" class="btn btn-outline-primary btn-sm" title="{{ r.descripcion }}"><i class="bi {{ r.icono }} me-1"></i>{{ r.titulo }}</a>{% endfor %}</div>{% endif %}
 <form method="get" class="card card-body mb-3">
   <div class="row g-2 align-items-end">
     <div class="col-6 col-md-2"><label class="form-label" for="r-desde">Desde</label><input id="r-desde" type="date" name="desde" value="{{ filtros.desde|date:'Y-m-d' }}" class="form-control"></div>

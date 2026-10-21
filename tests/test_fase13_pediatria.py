@@ -23,8 +23,12 @@ class PediatriaTest(BaseTest):
                                                 fecha_nacimiento=self.nacimiento)
             self.s = {s.codigo: s.pk for s in SeccionClinica.objects.visibles()}
 
-    def abrir(self, paciente=None):
-        r = self.cliente.post(f'/pacientes/{(paciente or self.nino).pk}/consultas/nueva/', {'tipo': 'PRIMERA'})
+    def abrir(self, paciente=None, plantilla=None):
+        datos = {'tipo': 'PRIMERA'}
+        if plantilla:
+            with self.en_tenant():
+                datos['plantilla'] = PlantillaHistoria.objects.get(nombre=plantilla).pk
+        r = self.cliente.post(f'/pacientes/{(paciente or self.nino).pk}/consultas/nueva/', datos)
         self.assertEqual(r.status_code, 302)
         with self.en_tenant():
             return Consulta.objects.latest('id')
@@ -35,17 +39,18 @@ class PediatriaTest(BaseTest):
     def test_plantillas_pediatricas_y_predeterminada(self):
         with self.en_tenant():
             nombres = set(PlantillaHistoria.objects.filter(activa=True).values_list('nombre', flat=True))
-            self.assertEqual(nombres, {'Primera consulta pediátrica', 'Control de niño sano',
-                                       'Consulta por enfermedad', 'Seguimiento'})
+            self.assertEqual(nombres, {'Consulta pediátrica', 'Primera consulta con ficha completa',
+                                       'Control de niño sano'})
         c = self.abrir()
         codigos = [i['codigo'] for i in c.estructura]
-        self.assertIn('ped.perinatales', codigos)
-        self.assertLess(codigos.index('nucleo.signos_vitales'), codigos.index('ped.antropometria'))
+        self.assertEqual(codigos[:4], ['ped.tipo', 'ped.antropometria', 'nucleo.signos_vitales', 'nucleo.motivo'])
+        self.assertNotIn('ped.perinatales', codigos)          # como en Pediae: la ficha va aparte
+        self.assertEqual(codigos[-1], 'ped.habitos')
         signos = next(i for i in c.estructura if i['codigo'] == 'nucleo.signos_vitales')
         self.assertNotIn('peso_kg', [x['clave'] for x in signos['campos']])     # el peso va en antropometría
 
     def test_antropometria_calcula_percentiles_y_guarda_medicion(self):
-        c = self.abrir()
+        c = self.abrir(plantilla='Primera consulta con ficha completa')
         r = self.cliente.post(f'/consultas/{c.pk}/editar/', {
             self.campo('nucleo.motivo', 'motivo'): 'Control',
             self.campo('nucleo.signos_vitales', 'fc'): '110',
@@ -70,7 +75,7 @@ class PediatriaTest(BaseTest):
             ficha = RegistroSeccionPaciente.objects.get(paciente=self.nino, seccion_id=self.s['ped.familiares'])
             self.assertEqual(sorted(ficha.datos['antecedentes']), ['ASMA_ATOPIA', 'DIABETES'])
         # la ficha pasa llena a la consulta siguiente
-        c2 = self.abrir()
+        c2 = self.abrir(plantilla='Primera consulta con ficha completa')
         with self.en_tenant():
             self.assertEqual(datos_guardados(c2)[self.s['ped.perinatales']]['peso_nacer_g'], 3200)
 
@@ -102,3 +107,18 @@ class PediatriaTest(BaseTest):
         otro, _ = crear_consultorio('Otro', 'otro-ped', especialidad='pediatria', usuario='otro')
         with self.en_tenant(otro):
             self.assertFalse(MedicionCrecimiento.objects.exists())
+
+    def test_ficha_pediatrica_fuera_de_la_consulta(self):
+        url = f'/pacientes/{self.nino.pk}/ficha/pediatria/'
+        r = self.cliente.get(url)
+        self.assertContains(r, 'Antecedentes prenatales')
+        r = self.cliente.post(url, {f's{self.s["ped.perinatales"]}-semanas_gestacion': '38',
+                                    f's{self.s["ped.perinatales"]}-via_parto': 'CESAREA',
+                                    f's{self.s["ped.perinatales"]}-indicacion_cesarea': 'Podálico'})
+        self.assertRedirects(r, f'/pacientes/{self.nino.pk}/', fetch_redirect_response=False)
+        r = self.cliente.get(f'/pacientes/{self.nino.pk}/')
+        self.assertContains(r, 'Ficha de pediatría')
+        self.assertContains(r, 'Podálico')
+        c = self.abrir(plantilla='Primera consulta con ficha completa')       # y aparece en la consulta
+        with self.en_tenant():
+            self.assertEqual(datos_guardados(c)[self.s['ped.perinatales']]['semanas_gestacion'], 38)

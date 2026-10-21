@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% block contenido %}
+<div class="om-eyebrow">Pediatría</div>
+<h1 class="h4">Vacunas y pesquisas del consultorio</h1>
+<p class="small text-muted">El esquema del sistema es el que usa Pediae. Aquí agregas vacunas o pesquisas propias (p. ej. una vacuna privada o un refuerzo); aparecen en el esquema de todos tus pacientes.</p>
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card mb-3"><div class="card-header bg-white fw-semibold">Agregar vacuna</div>
+      <form method="post" class="card-body">{% csrf_token %}<input type="hidden" name="accion" value="vacuna">
+        <div class="row g-2">
+          <div class="col-md-6"><label class="form-label small">Nombre</label><input name="nombre" class="form-control" required maxlength="100"></div>
+          <div class="col-md-6"><label class="form-label small">Protege contra</label><input name="enfermedad" class="form-control" maxlength="200"></div>
+          <div class="col-4 col-md-2"><label class="form-label small">Dosis</label><input type="number" name="dosis" value="1" min="1" class="form-control"></div>
+          <div class="col-4 col-md-3"><label class="form-label small">Edad (meses)</label><input type="number" name="edad_meses" min="0" value="0" class="form-control"></div>
+          <div class="col-4 col-md-3"><label class="form-label small">Edad máx. (meses)</label><input type="number" name="edad_max_meses" min="0" class="form-control"></div>
+          <div class="col-md-4"><label class="form-label small">Grupo</label><input name="grupo" class="form-control" placeholder="Otras vacunas" maxlength="60"></div>
+          <div class="col-12"><div class="form-check"><input type="checkbox" name="anual" id="anual" class="form-check-input"><label for="anual" class="form-check-label small">Se aplica cada año</label></div></div>
+        </div>
+        <button class="btn btn-primary btn-sm mt-2">Agregar</button>
+      </form>
+    </div>
+    <div class="card"><div class="card-header bg-white fw-semibold">Vacunas propias</div>
+      <ul class="list-group list-group-flush small">{% for v in propias %}<li class="list-group-item d-flex justify-content-between">{{ v }} · {{ v.edad_texto }}{% if v.anual %} · anual{% endif %}
+        <form method="post">{% csrf_token %}<input type="hidden" name="accion" value="quitar_vacuna"><input type="hidden" name="id" value="{{ v.pk }}"><button class="btn btn-link btn-sm p-0 text-danger">quitar</button></form></li>
+      {% empty %}<li class="list-group-item text-muted">Ninguna.</li>{% endfor %}</ul>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="card mb-3"><div class="card-header bg-white fw-semibold">Agregar pesquisa</div>
+      <form method="post" class="card-body">{% csrf_token %}<input type="hidden" name="accion" value="pesquisa">
+        <label class="form-label small">Nombre</label><input name="nombre" class="form-control mb-2" required maxlength="100">
+        <label class="form-label small">Descripción</label><input name="descripcion" class="form-control" maxlength="200">
+        <button class="btn btn-primary btn-sm mt-2">Agregar</button>
+      </form>
+    </div>
+    <div class="card mb-3"><div class="card-header bg-white fw-semibold">Pesquisas</div>
+      <ul class="list-group list-group-flush small">{% for p in pesquisas_sistema %}<li class="list-group-item">{{ p.nombre }} <span class="text-muted">· sistema</span></li>{% endfor %}
+        {% for p in pesquisas_propias %}<li class="list-group-item d-flex justify-content-between">{{ p.nombre }}<form method="post">{% csrf_token %}<input type="hidden" name="accion" value="quitar_pesquisa"><input type="hidden" name="id" value="{{ p.pk }}"><button class="btn btn-link btn-sm p-0 text-danger">quitar</button></form></li>{% endfor %}</ul>
+    </div>
+    <div class="card"><div class="card-header bg-white fw-semibold">Esquema del sistema ({{ sistema|length }})</div>
+      <ul class="list-group list-group-flush small" style="max-height:360px;overflow:auto">{% for v in sistema %}<li class="list-group-item">{{ v.nombre }} · d{{ v.dosis }} <span class="text-muted">· {{ v.edad_texto }}</span></li>{% endfor %}</ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

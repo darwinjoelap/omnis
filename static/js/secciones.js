@@ -95,3 +95,72 @@
     });
   }
 })();
+
+// Glosario de medicamentos en el récipe: calcula la dosis (peso/edad) y llena la primera fila libre.
+(function () {
+  const barra = document.querySelector('[data-glosario]');
+  if (!barra || !barra.querySelector('#glosario-med')) return;
+  const tarjeta = barra.closest('[data-seccion]');
+  const peso = barra.querySelector('#glosario-peso');
+  const msg = barra.querySelector('[data-glosario-msg]');
+
+  function pesoDelFormulario() {
+    const campos = document.querySelectorAll('[name$="-peso_kg"]');
+    for (const c of campos) { if (c.value) return c.value; }
+    return '';
+  }
+  // El peso se toma de antropometría/signos vitales mientras el médico no lo cambie a mano
+  function sincronizarPeso() { if (!peso.dataset.manual) peso.value = pesoDelFormulario(); }
+  peso.addEventListener('input', function () { peso.dataset.manual = '1'; });
+  document.addEventListener('input', function (e) { if (e.target.name && e.target.name.endsWith('-peso_kg')) sincronizarPeso(); });
+  sincronizarPeso();
+
+  function filaLibre() {
+    const nombres = tarjeta.querySelectorAll('[name*="-medicamentos__"][name$="__medicamento"]');
+    for (const n of nombres) { if (!n.value.trim()) return n; }
+    const boton = tarjeta.querySelector('[data-agregar-fila]');
+    if (!boton) return null;
+    boton.click();
+    const todos = tarjeta.querySelectorAll('[name*="-medicamentos__"][name$="__medicamento"]');
+    return todos[todos.length - 1];
+  }
+  function poner(base, sufijo, valor) {
+    const el = tarjeta.querySelector('[name="' + base + sufijo + '"]');
+    if (el && valor) el.value = valor;
+  }
+
+  barra.querySelector('[data-glosario-agregar]').addEventListener('click', function () {
+    const sel = barra.querySelector('#glosario-med');
+    if (!sel.value) { sel.focus(); return; }
+    const url = barra.dataset.url.replace('/0/', '/' + sel.value + '/') + '?' + new URLSearchParams({
+      peso: peso.value.replace(',', '.'), edad_meses: barra.dataset.edadMeses,
+      nivel: barra.querySelector('#glosario-nivel').value});
+    msg.textContent = 'Calculando…';
+    fetch(url, {headers: {'X-Requested-With': 'fetch'}}).then(function (r) {
+      if (!r.ok) throw new Error(r.status);
+      return r.json();
+    }).then(function (d) {
+      const campo = filaLibre();
+      if (!campo) { msg.textContent = 'No encontré la tabla del récipe.'; return; }
+      const base = campo.name.replace(/medicamento$/, '');
+      campo.value = d.medicamento;
+      poner(base, 'dosis', d.dosis);
+      poner(base, 'frecuencia', d.frecuencia);
+      poner(base, 'duracion', d.duracion);
+      const obs = tarjeta.querySelector('[name$="-observaciones"]');
+      if (obs && d.texto && d.calculada) obs.value = (obs.value ? obs.value.trimEnd() + '\n' : '') + d.texto;
+      msg.innerHTML = '';
+      const ok = document.createElement('div');
+      ok.className = 'text-success';
+      ok.textContent = '✓ ' + d.medicamento + (d.dosis ? ': ' + d.dosis : '') + (d.dosis_mg && d.dosis_mg !== d.dosis ? ' (' + d.dosis_mg + ')' : '');
+      msg.appendChild(ok);
+      (d.alertas || []).forEach(function (a) {
+        const div = document.createElement('div');
+        div.className = 'text-' + a.tipo;
+        div.textContent = a.msg;
+        msg.appendChild(div);
+      });
+      sel.value = '';
+    }).catch(function () { msg.textContent = 'No se pudo calcular (¿sin conexión?). Escribe la dosis a mano.'; });
+  });
+})();

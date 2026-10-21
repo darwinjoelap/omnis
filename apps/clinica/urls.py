@@ -1,11 +1,17 @@
 from django.urls import path
 
 from . import views_consultas as vc
+from . import views_medicamentos as vm
 from . import views_plantillas as vp
 
 app_name = 'clinica'
 
 urlpatterns = [
+    path('medicamentos/', vm.lista, name='medicamentos'),
+    path('medicamentos/nuevo/', vm.editar, name='medicamento_nuevo'),
+    path('medicamentos/<int:pk>/', vm.editar, name='medicamento'),
+    path('medicamentos/<int:pk>/activar/', vm.activar, name='medicamento_activar'),
+    path('medicamentos/<int:pk>/calcular/', vm.calcular_json, name='medicamento_calcular'),
     path('plantillas/', vp.plantillas, name='plantillas'),
     path('plantillas/nueva/', vp.plantilla_nueva, name='plantilla_nueva'),
     path('plantillas/<int:pk>/', vp.plantilla, name='plantilla'),
@@ -18,6 +24,7 @@ urlpatterns = [
     path('secciones/<int:pk>/editar/', vp.seccion_editar, name='seccion_editar'),
     path('secciones/<int:pk>/activa/', vp.seccion_activa, name='seccion_activa'),
     path('pacientes/<int:paciente_pk>/consultas/nueva/', vc.nueva, name='consulta_nueva'),
+    path('pacientes/<int:paciente_pk>/ficha/<slug:codigo>/', vc.ficha_especialidad, name='ficha_especialidad'),
     path('consultas/<int:pk>/', vc.detalle, name='consulta'),
     path('consultas/<int:pk>/editar/', vc.editar, name='consulta_editar'),
     path('consultas/<int:pk>/imprimir/', vc.imprimir, name='consulta_imprimir'),

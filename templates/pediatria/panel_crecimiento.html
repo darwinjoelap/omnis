@@ -1,0 +1,40 @@
+{# Panel de pediatría en la ficha del paciente: curvas OMS con los puntos del paciente #}
+<div class="card mb-3 om-panel-crecimiento">
+  <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span><i class="bi bi-graph-up me-1"></i>Crecimiento (OMS)</span>
+    {% if panel.graficos %}<a href="{% url 'documentos:emitir' 'ped_curvas' %}?paciente={{ paciente.pk }}" class="small"><i class="bi bi-file-earmark-pdf me-1"></i>PDF de las curvas</a>{% endif %}
+  </div>
+  <div class="card-body">
+    {% if panel.sin_sexo %}<div class="small text-warning-emphasis mb-2"><i class="bi bi-exclamation-triangle me-1"></i>Falta el sexo del paciente: sin él no hay percentiles ni curvas. <a href="{% url 'pacientes:editar' paciente.pk %}">Completar</a></div>{% endif %}
+    {% if panel.ultima %}
+    <div class="d-flex flex-wrap gap-2 mb-3 small">
+      <span class="text-muted align-self-center">Última medición ({{ panel.ultima.fecha|date:"d/m/Y" }}):</span>
+      {% if panel.ultima.peso_kg %}<span class="om-chip">Peso {{ panel.ultima.peso_kg|floatformat:"-2" }} kg{% if panel.ultima.p_peso is not None %} · P{{ panel.ultima.p_peso|floatformat:"-1" }}{% endif %}</span>{% endif %}
+      {% if panel.ultima.talla_cm %}<span class="om-chip">Talla {{ panel.ultima.talla_cm|floatformat:"-1" }} cm{% if panel.ultima.p_talla is not None %} · P{{ panel.ultima.p_talla|floatformat:"-1" }}{% endif %}</span>{% endif %}
+      {% if panel.ultima.pc_cm %}<span class="om-chip">PC {{ panel.ultima.pc_cm|floatformat:"-1" }} cm{% if panel.ultima.p_pc is not None %} · P{{ panel.ultima.p_pc|floatformat:"-1" }}{% endif %}</span>{% endif %}
+      {% if panel.ultima.estado_nutricional %}<span class="om-chip om-chip-estado">{{ panel.ultima.estado_nutricional }}</span>{% endif %}
+    </div>
+    {% endif %}
+    {% if panel.graficos %}
+    <ul class="nav nav-pills nav-sm gap-1 mb-2" role="tablist">
+      {% for g in panel.graficos %}<li class="nav-item"><button class="nav-link py-1 px-3 {% if forloop.first %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#curva-{{ g.codigo }}" type="button" role="tab">{{ g.titulo|cut:" para la edad" }}</button></li>{% endfor %}
+    </ul>
+    <div class="tab-content">
+      {% for g in panel.graficos %}<div class="tab-pane fade {% if forloop.first %}show active{% endif %}" id="curva-{{ g.codigo }}" role="tabpanel">{{ g.svg|safe }}{% if not g.n %}<div class="small text-muted">Aún no hay mediciones para esta curva.</div>{% endif %}</div>{% endfor %}
+    </div>
+    <div class="small text-muted mt-1">Toca un punto para abrir la consulta. Líneas: P3 · P15 · P50 · P85 · P97.</div>
+    {% elif not panel.sin_sexo %}<div class="small text-muted">Las curvas aparecen cuando se registra peso o talla en una consulta (sección «Antropometría»).</div>{% endif %}
+    {% if panel.mediciones %}
+    <div class="table-responsive mt-3"><table class="table table-sm small mb-0">
+      <thead class="table-light"><tr><th>Fecha</th><th class="text-end">Peso</th><th class="text-end">Talla</th><th class="text-end">PC</th><th class="text-end">IMC</th><th>Estado</th></tr></thead>
+      <tbody>{% for m in panel.mediciones %}<tr>
+        <td>{% if m.consulta_id %}<a href="{% url 'clinica:consulta' m.consulta_id %}">{{ m.fecha|date:"d/m/Y" }}</a>{% else %}{{ m.fecha|date:"d/m/Y" }}{% endif %}</td>
+        <td class="text-end">{{ m.peso_kg|floatformat:"-2"|default:"" }}{% if m.p_peso is not None %} <span class="text-muted">P{{ m.p_peso|floatformat:"0" }}</span>{% endif %}</td>
+        <td class="text-end">{{ m.talla_cm|floatformat:"-1"|default:"" }}{% if m.p_talla is not None %} <span class="text-muted">P{{ m.p_talla|floatformat:"0" }}</span>{% endif %}</td>
+        <td class="text-end">{{ m.pc_cm|floatformat:"-1"|default:"" }}{% if m.p_pc is not None %} <span class="text-muted">P{{ m.p_pc|floatformat:"0" }}</span>{% endif %}</td>
+        <td class="text-end">{{ m.imc|floatformat:"-1"|default:"" }}</td>
+        <td>{{ m.estado_nutricional|default:"—" }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% endif %}
+  </div>
+</div>

@@ -1,0 +1,26 @@
+{# Panel de pediatría: resumen de vacunas y pesquisas #}
+<div class="card mb-3">
+  <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-shield-plus me-1"></i>Vacunas y pesquisas</span>
+    <a href="{% url 'pediatria:vacunas' paciente.pk %}" class="small">Ver esquema completo</a>
+  </div>
+  <div class="card-body small">
+    {% with r=panel.resumen %}
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+      <span class="fw-semibold">{{ r.aplicadas }} de {{ r.total }} dosis registradas</span>
+      {% if r.al_dia %}<span class="badge text-bg-success">Al día para su edad</span>{% endif %}
+      {% if r.atrasadas %}<span class="badge text-bg-danger">{{ r.atrasadas|length }} atrasada{{ r.atrasadas|length|pluralize }}</span>{% endif %}
+      {% if r.pendientes %}<span class="badge text-bg-warning">{{ r.pendientes|length }} pendiente{{ r.pendientes|length|pluralize }}</span>{% endif %}
+    </div>
+    {% if r.atrasadas or r.pendientes %}
+    <ul class="list-unstyled mb-2">
+      {% for f in r.atrasadas|slice:":4" %}<li><i class="bi bi-exclamation-circle text-danger me-1"></i>{{ f.vacuna.nombre }} · dosis {{ f.vacuna.dosis }} <span class="text-muted">({{ f.vacuna.edad_texto }})</span></li>{% endfor %}
+      {% for f in r.pendientes|slice:":3" %}<li><i class="bi bi-clock text-warning-emphasis me-1"></i>{{ f.vacuna.nombre }} · dosis {{ f.vacuna.dosis }} <span class="text-muted">({{ f.vacuna.edad_texto }})</span></li>{% endfor %}
+    </ul>
+    {% endif %}
+    {% endwith %}
+    <div class="d-flex flex-wrap gap-1">
+      {% for p in panel.pesquisas %}<span class="om-chip {% if p.realizada %}om-chip-ok{% endif %}" title="{% if p.realizada %}{{ p.realizada.fecha|date:'d/m/Y' }} {{ p.realizada.resultado }}{% else %}Pendiente{% endif %}"><i class="bi {% if p.realizada %}bi-check2{% else %}bi-circle{% endif %} me-1"></i>{{ p.pesquisa.nombre }}</span>{% endfor %}
+    </div>
+  </div>
+</div>

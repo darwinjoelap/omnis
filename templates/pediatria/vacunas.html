@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% block contenido %}
+<a href="{% url 'pacientes:detalle' paciente.pk %}" class="small text-decoration-none"><i class="bi bi-arrow-left"></i> {{ paciente.nombre_completo }}</a>
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mt-1 mb-3">
+  <div>
+    <div class="om-eyebrow">Esquema de vacunación</div>
+    <h1 class="h4 mb-0">{{ paciente.nombre_completo }} <span class="small text-muted fw-normal">{{ paciente.edad_texto }}</span></h1>
+    <div class="d-flex flex-wrap gap-2 mt-2 small">
+      <span class="badge text-bg-success">{{ conteo.aplicada }} aplicadas</span>
+      <span class="badge text-bg-warning">{{ conteo.pendiente }} pendientes</span>
+      <span class="badge text-bg-danger">{{ conteo.atrasada }} atrasadas</span>
+      <span class="badge text-bg-secondary">{{ conteo.futura }} más adelante</span>
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'documentos:emitir' 'ped_vacunas' %}?paciente={{ paciente.pk }}" target="_blank" data-pdf class="btn btn-outline-secondary btn-sm"><i class="bi bi-file-earmark-pdf me-1"></i>PDF del esquema</a>
+    {% if 'plantillas.clinica' in permisos %}<a href="{% url 'pediatria:catalogo' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-gear me-1"></i>Catálogo</a>{% endif %}
+  </div>
+</div>
+{% if not paciente.fecha_nacimiento %}<div class="alert alert-warning py-2 small">Sin fecha de nacimiento no se puede saber qué vacunas tocan.</div>{% endif %}
+{% for g in grupos %}
+<div class="card mb-3">
+  <div class="card-header bg-white fw-semibold">{{ g.nombre }}</div>
+  <div class="list-group list-group-flush">
+    {% for f in g.vacunas %}
+    <div class="list-group-item">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div><span class="fw-semibold">{{ f.vacuna.nombre }}</span> <span class="small text-muted">· dosis {{ f.vacuna.dosis }}{% if f.vacuna.anual %} · anual{% endif %} · {{ f.vacuna.edad_texto }}</span>
+          <div class="small text-muted">{{ f.vacuna.enfermedad }}</div></div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge text-bg-{{ f.color }}">{{ f.texto }}</span>
+          {% if 'consultas.crear' in permisos %}
+            {% if not f.aplicada or f.vacuna.anual %}
+            <form method="post" action="{% url 'pediatria:vacuna_registrar' paciente.pk %}" class="d-inline">{% csrf_token %}<input type="hidden" name="vacuna" value="{{ f.vacuna.pk }}">
+              <button class="btn btn-sm btn-outline-success py-0" title="Marcar como aplicada (sin fecha)"><i class="bi bi-check2"></i></button></form>
+            {% endif %}
+            <button type="button" class="btn btn-sm btn-outline-secondary py-0" data-bs-toggle="collapse" data-bs-target="#va-{{ f.vacuna.pk }}" title="Con fecha y lote"><i class="bi bi-pencil"></i></button>
+          {% endif %}
+        </div>
+      </div>
+      {% for a in f.historial %}
+        <div class="small mt-1 d-flex align-items-center gap-2"><i class="bi bi-check2-circle text-success"></i>{{ a.fecha|date:"d/m/Y"|default:"Sin fecha" }}{% if a.lote %} · lote {{ a.lote }}{% endif %}{% if a.observaciones %} · {{ a.observaciones }}{% endif %}
+          {% if 'consultas.crear' in permisos %}<form method="post" action="{% url 'pediatria:vacuna_eliminar' paciente.pk a.pk %}" onsubmit="return confirm('¿Quitar este registro?')">{% csrf_token %}<button class="btn btn-link btn-sm p-0 text-danger">quitar</button></form>{% endif %}</div>
+      {% endfor %}
+      {% if 'consultas.crear' in permisos %}
+      <form method="post" action="{% url 'pediatria:vacuna_registrar' paciente.pk %}" class="collapse mt-2" id="va-{{ f.vacuna.pk }}">{% csrf_token %}
+        <input type="hidden" name="vacuna" value="{{ f.vacuna.pk }}">
+        <div class="row g-2 align-items-end">
+          <div class="col-6 col-md-3"><label class="form-label small mb-0">Fecha</label><input type="date" name="fecha" class="form-control form-control-sm" max="{{ hoy|date:'Y-m-d' }}"></div>
+          <div class="col-6 col-md-3"><label class="form-label small mb-0">Lote / laboratorio</label><input name="lote" class="form-control form-control-sm" maxlength="60"></div>
+          <div class="col-md-4"><label class="form-label small mb-0">Observaciones</label><input name="observaciones" class="form-control form-control-sm" maxlength="300"></div>
+          <div class="col-md-2"><button class="btn btn-sm btn-primary w-100">Guardar</button></div>
+        </div>
+      </form>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endfor %}
+<div class="card mb-3" id="pesquisas">
+  <div class="card-header bg-white fw-semibold">Pesquisas</div>
+  <div class="list-group list-group-flush">
+    {% for p in pesquisas %}
+    <div class="list-group-item">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div><span class="fw-semibold">{{ p.pesquisa.nombre }}</span> <span class="small text-muted">· {{ p.pesquisa.descripcion }}</span>
+          {% if p.realizada %}<div class="small"><i class="bi bi-check2-circle text-success me-1"></i>{{ p.realizada.fecha|date:"d/m/Y"|default:"Sin fecha" }}{% if p.realizada.resultado %} · {{ p.realizada.resultado }}{% endif %}</div>{% endif %}</div>
+        <div class="d-flex gap-2 align-items-center">
+          <span class="badge text-bg-{% if p.realizada %}success{% else %}secondary{% endif %}">{% if p.realizada %}Realizada{% else %}Pendiente{% endif %}</span>
+          {% if 'consultas.crear' in permisos %}
+            <button type="button" class="btn btn-sm btn-outline-secondary py-0" data-bs-toggle="collapse" data-bs-target="#pq-{{ p.pesquisa.pk }}"><i class="bi bi-pencil"></i></button>
+            {% if p.realizada %}<form method="post" action="{% url 'pediatria:pesquisa_eliminar' paciente.pk p.realizada.pk %}" onsubmit="return confirm('¿Quitar este registro?')">{% csrf_token %}<button class="btn btn-link btn-sm p-0 text-danger">quitar</button></form>{% endif %}
+          {% endif %}
+        </div>
+      </div>
+      {% if 'consultas.crear' in permisos %}
+      <form method="post" action="{% url 'pediatria:pesquisa_registrar' paciente.pk %}" class="collapse mt-2" id="pq-{{ p.pesquisa.pk }}">{% csrf_token %}
+        <input type="hidden" name="pesquisa" value="{{ p.pesquisa.pk }}"><input type="hidden" name="volver" value="{% url 'pediatria:vacunas' paciente.pk %}#pesquisas">
+        <div class="row g-2 align-items-end">
+          <div class="col-6 col-md-3"><label class="form-label small mb-0">Fecha</label><input type="date" name="fecha" class="form-control form-control-sm" value="{{ p.realizada.fecha|date:'Y-m-d' }}"></div>
+          <div class="col-md-7"><label class="form-label small mb-0">Resultado / comentario</label><input name="resultado" class="form-control form-control-sm" maxlength="300" value="{{ p.realizada.resultado|default:'' }}"></div>
+          <div class="col-md-2"><button class="btn btn-sm btn-primary w-100">Guardar</button></div>
+        </div>
+      </form>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

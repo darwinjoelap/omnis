@@ -9,9 +9,10 @@ from .consulta import (
     RegistroSeccionPaciente,
     SignosVitales,
 )
+from .medicamentos import Medicamento
 from .plantillas import PlantillaHistoria, PlantillaSeccion
 from .secciones import SeccionClinica, SeccionClinicaVersion
 
 __all__ = ['SeccionClinica', 'SeccionClinicaVersion', 'PlantillaHistoria', 'PlantillaSeccion', 'Cie10', 'Consulta',
            'RegistroSeccion', 'RegistroSeccionPaciente', 'SignosVitales', 'DiagnosticoConsulta', 'ItemPrescripcion',
-           'Enmienda', 'Adjunto']
+           'Enmienda', 'Adjunto', 'Medicamento']

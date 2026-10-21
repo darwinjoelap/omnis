@@ -92,7 +92,34 @@ def resumen_paciente(request, paciente):
         'tipos_consulta': Consulta.Tipo.choices,
         'ocultas': Consulta.objects.filter(paciente=paciente).count() - len(consultas),
         'plantilla_sugerida': plantilla_para(perfil) if perfil else None,
+        **fichas_y_paneles(request, paciente),
     }
+
+
+def fichas_y_paneles(request, paciente):
+    """
+    Lo que aportan los perfiles de especialidad a la ficha del paciente: la ficha de cada especialidad del
+    consultorio (la del profesional que mira, o las que ya tienen datos) y los paneles de los módulos
+    (curvas de crecimiento, vacunas…).
+    """
+    from . import registro
+    from .consultas import items_ficha, lectura_ficha
+    perfil = request.membresia.perfil_activo
+    propia = perfil.especialidad.codigo if perfil and perfil.especialidad_id else None
+    codigos = list(request.tenant.especialidades.order_by('orden').values_list('codigo', 'nombre'))
+    fichas = []
+    for codigo, nombre in codigos:
+        if not items_ficha(codigo):
+            continue
+        lectura = lectura_ficha(paciente, codigo)
+        if lectura or codigo == propia:
+            fichas.append({'codigo': codigo, 'nombre': nombre, 'lectura': lectura})
+    paneles = []
+    for panel in registro.paneles({c for c, _ in codigos}):
+        contexto = panel.contexto(request, paciente) if panel.contexto else {}
+        if contexto is not None:
+            paneles.append({'def': panel, 'ctx': contexto})
+    return {'fichas_especialidad': fichas, 'paneles_especialidad': paneles}
 
 
 def consultas_en_curso(perfil, limite=10):

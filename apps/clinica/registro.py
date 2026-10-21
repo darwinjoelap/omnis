@@ -36,6 +36,27 @@ class PlantillaDef:
 
 
 @dataclass
+class PanelDef:
+    """Tarjeta que un módulo agrega a la ficha del paciente (p. ej. «Crecimiento», «Vacunas»)."""
+    codigo: str
+    titulo: str
+    plantilla: str                    # template que se incluye
+    contexto: object = None           # función(request, paciente) -> dict | None (None = no se muestra)
+    orden: int = 100
+    clinico: bool = True              # solo para quien ve la historia
+
+
+@dataclass
+class ReporteDef:
+    """Reporte propio de una especialidad (aparece en «Reportes»)."""
+    codigo: str
+    titulo: str
+    url: str                          # nombre de URL ('pediatria:reporte')
+    icono: str = 'bi-graph-up'
+    descripcion: str = ''
+
+
+@dataclass
 class EspecialidadDef:
     codigo: str
     nombre: str
@@ -47,6 +68,9 @@ class EspecialidadDef:
     calculos: dict = field(default_factory=dict)
     plantillas: list = field(default_factory=list)
     documentos: list = field(default_factory=list)
+    paneles: list = field(default_factory=list)
+    reportes: list = field(default_factory=list)
+    paginas_paciente: list = field(default_factory=list)   # nombres de URL (pk del paciente) que se precargan offline
     basica: bool = False         # registrada por `general` sin módulo propio: un módulo real la reemplaza
 
 
@@ -90,6 +114,16 @@ def registrar(esp: EspecialidadDef):
 
 def especialidades():
     return dict(_especialidades)
+
+
+def paneles(codigos):
+    """Paneles de la ficha del paciente de las especialidades habilitadas (códigos), ordenados."""
+    salida = [p for c, e in _especialidades.items() if c in codigos for p in e.paneles]
+    return sorted(salida, key=lambda p: p.orden)
+
+
+def reportes(codigos):
+    return [r for c, e in _especialidades.items() if c in codigos for r in e.reportes]
 
 
 def especialidad(codigo):

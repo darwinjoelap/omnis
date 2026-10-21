@@ -73,14 +73,16 @@ def actualizar_plantillas_de_modulos():
                 if not viejas.exists() and PlantillaHistoria.objects.filter(
                         especialidad=especialidad, origen__in=vigentes).count() == len(vigentes):
                     continue
-                cambia_predeterminada = viejas.filter(es_predeterminada=True).exists()
+                nueva = next((p for p in definicion.plantillas if p.predeterminada), definicion.plantillas[0])
+                origen_nueva = f'{especialidad.codigo}:{nueva.nombre}'
+                existia = PlantillaHistoria.objects.filter(especialidad=especialidad, origen=origen_nueva).exists()
+                cambia_predeterminada = viejas.filter(es_predeterminada=True).exists() or not existia
                 viejas.update(activa=False, es_predeterminada=False)
                 asegurar_plantillas_especialidad(especialidad)
-                if cambia_predeterminada:
-                    nueva = next((p for p in definicion.plantillas if p.predeterminada), definicion.plantillas[0])
-                    PlantillaHistoria.objects.filter(especialidad=especialidad, profesional__isnull=True,
-                                                     origen=f'{especialidad.codigo}:{nueva.nombre}') \
-                        .update(es_predeterminada=True)
+                if cambia_predeterminada:       # la predeterminada nueva del módulo pasa a ser la del consultorio
+                    sistema = PlantillaHistoria.objects.filter(especialidad=especialidad, profesional__isnull=True)
+                    sistema.update(es_predeterminada=False)
+                    sistema.filter(origen=origen_nueva).update(es_predeterminada=True, activa=True)
                 log.info('%s: plantillas de %s actualizadas.', tenant.nombre, especialidad.nombre)
 
 

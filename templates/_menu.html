@@ -22,6 +22,7 @@
     {% endif %}
     {% if 'plantillas.propias' in permisos or 'plantillas.clinica' in permisos %}
       <div class="nav-seccion">Historia clínica</div>
+      {% if 'consultas.crear' in permisos %}<a href="{% url 'clinica:medicamentos' %}" class="nav-link {% if app == 'clinica' and 'medicamento' in nombre %}active{% endif %}"><i class="bi bi-capsule"></i> Medicamentos</a>{% endif %}
       <a href="{% url 'clinica:plantillas' %}" class="nav-link {% if app == 'clinica' and 'plantilla' in nombre %}active{% endif %}"><i class="bi bi-ui-checks-grid"></i> Plantillas</a>
       <a href="{% url 'clinica:secciones' %}" class="nav-link {% if app == 'clinica' and 'seccion' in nombre %}active{% endif %}"><i class="bi bi-puzzle"></i> Secciones</a>
     {% endif %}

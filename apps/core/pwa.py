@@ -83,7 +83,7 @@ def offline(request):
     return render(request, 'core/offline.html', {'titulo': 'Sin conexión'})
 
 
-SW_REVISION = 'f12'    # subir al cambiar la lógica del service worker
+SW_REVISION = 'f13'    # subir al cambiar la lógica del service worker
 
 SW_JS = r"""// Omnis service worker · __VERSION__
 const VERSION = '__VERSION__';
@@ -104,6 +104,8 @@ const PAGINAS_OFFLINE = [
   /^\/pacientes\/\d+\/$/,
   /^\/pacientes\/\d+\/consultas\/nueva\/$/,
   /^\/consultas\/\d+\/(editar\/)?$/,
+  /^\/pacientes\/\d+\/ficha\/[a-z_]+\/$/,
+  /^\/esp\/[a-z_]+\/pacientes\/\d+\/vacunas\/$/,
 ];
 const esPaginaOffline = (url) => PAGINAS_OFFLINE.some((re) => re.test(url.pathname));
 const esLogin = (url) => url.pathname === LOGIN;

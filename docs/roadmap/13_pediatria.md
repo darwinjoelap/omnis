@@ -122,14 +122,14 @@ pagos pendientes.
 ## 4. Diseño propuesto (respeta `05_GUIA_ESPECIALIDADES.md`: no se parchea el núcleo)
 
 ### 4.1 Núcleo (sirve a todas las especialidades) — ajustes previos
-- [ ] **Próximo control → cita TENTATIVA sin hora** al guardar/cerrar la consulta (campo `proximo_control` ya
+- [x] **Próximo control → cita TENTATIVA sin hora** al guardar/cerrar la consulta (campo `proximo_control` ya
       existe en «Plan»): mismo profesional y lugar, motivo «Control – {diagnóstico principal}», sin duplicar si ya
       hay una cita activa ese día; aviso «Cita tentativa creada para el dd/mm».
-- [ ] **Cumpleaños del día** en la agenda con «Felicitar» por WhatsApp (representante si es menor, texto
+- [x] **Cumpleaños del día** en la agenda con «Felicitar» por WhatsApp (representante si es menor, texto
       editable en Configuración).
-- [ ] Sexo del paciente **opcional** en el registro rápido (como Pediae), con aviso donde se necesita (percentiles).
+- [x] Sexo del paciente **opcional** en el registro rápido (como Pediae), con aviso donde se necesita (percentiles).
 - [ ] Registro rápido por la asistente y botones de la médica (guardar · historia · agendar).
-- [ ] Gancho nuevo del registro: `reportes` y `documentos` por especialidad, y `tabs` en la ficha del paciente.
+- [x] Gancho nuevo del registro: `reportes`, `documentos`, `paneles` en la ficha del paciente, rutas y páginas offline por especialidad (ADR-036).
 
 ### 4.2 `apps/especialidades/pediatria/`
 | Pieza | Tipo | Por qué |
@@ -170,22 +170,22 @@ Ver decisión D2 (núcleo o solo pediatría). Modelo `Medicamento` como el de Pe
       *(página «Ficha pediátrica» fuera de la consulta: pendiente)*
 - [x] 13.3 Antropometría + percentiles OMS (0–19 años) + clasificaciones + `MedicionCrecimiento` + tests contra la
       OMS. *(vista previa de percentiles mientras se escribe: pendiente)*
-- [ ] 13.4 Curvas de crecimiento (pantalla + PDF), punto de nacimiento, clic → consulta.
-- [ ] 13.5 Vacunas (catálogo, registro, marcar con un toque, anual, resumen, PDF) y pesquisas.
-- [ ] 13.6 Glosario + calculadora de dosis + inserción en el récipe.
-- [ ] 13.7 Documentos: niño sano, lactancia, lactancia trabajo, historia completa.
-- [ ] 13.8 Reportes pediátricos + PDF/Excel.
-- [ ] 13.9 Offline: ficha, curvas y vacunas en `PAGINAS_OFFLINE` y en la precarga.
+- [x] 13.4 Curvas de crecimiento (pantalla + PDF), punto de nacimiento, clic → consulta.
+- [x] 13.5 Vacunas (catálogo, registro, marcar con un toque, anual, resumen, PDF) y pesquisas.
+- [x] 13.6 Glosario + calculadora de dosis + inserción en el récipe (núcleo, ADR-037).
+- [~] 13.7 Documentos: niño sano, lactancia, lactancia trabajo, carnet de vacunas, curvas ✔ · falta historia completa.
+- [~] 13.8 Reportes pediátricos + Excel ✔ · falta PDF.
+- [x] 13.9 Offline: ficha, curvas y vacunas en `PAGINAS_OFFLINE` y en la precarga.
 - [ ] 13.10 Revisión con una pediatra real (Dra. de Pediae) antes de cerrar.
 
 ## 7. Tests
 - [ ] Percentiles contra valores publicados por la OMS (≥ 10 casos por indicador y sexo, incluidos bordes).
-- [ ] Clasificación nutricional en los límites exactos (p3, p10, p15, p85, p97).
-- [ ] Calculadora: cada modo, techo absoluto, redondeos, alertas de edad/peso, plantilla con variables.
-- [ ] Vacunas: estados por edad, anual con varias aplicaciones, catálogo propio aislado por consultorio.
-- [ ] Próximo control: crea una sola tentativa, sin hora, mismo lugar; no duplica.
+- [x] Clasificación nutricional en los límites exactos (p3, p10, p15, p85, p97).
+- [x] Calculadora: cada modo, techo absoluto, redondeos, alertas de edad/peso, plantilla con variables.
+- [x] Vacunas: estados por edad, anual con varias aplicaciones, catálogo propio aislado por consultorio.
+- [x] Próximo control: crea una sola tentativa, sin hora, mismo lugar; no duplica.
 - [ ] Cumpleaños: saludo al representante si es menor, al paciente si es adulto; sin teléfono → sin botón.
-- [ ] PDFs generan sin error (con y sin firma, vacunas sin fecha).
+- [x] PDFs generan sin error (con y sin firma, vacunas sin fecha).
 - [ ] Aislamiento entre consultorios en todos los modelos nuevos.
 
 ## 8. Criterio de salida (verificable)

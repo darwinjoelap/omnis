@@ -167,14 +167,54 @@ def lectura(consulta):
     return salida
 
 
+# ── Ficha de especialidad (secciones de ámbito PACIENTE fuera de la consulta) ──
+
+def items_ficha(codigo_especialidad):
+    """Secciones PACIENTE de una especialidad (la «ficha pediátrica», «ficha ginecológica»…), como ítems."""
+    secciones = (SeccionClinica.objects.visibles().filter(ambito='PACIENTE', activa=True,
+                                                         especialidad__codigo=codigo_especialidad)
+                 .order_by('orden', 'nombre'))
+    return [{'seccion_id': s.pk, 'codigo': s.codigo, 'nombre': s.nombre, 'version': s.version, 'ambito': s.ambito,
+             'obligatoria': False, 'colapsada': False, 'campos': esquemas.campos_efectivos(s.esquema)}
+            for s in secciones]
+
+
+def datos_ficha(paciente, items):
+    ids = [i['seccion_id'] for i in items]
+    return {r.seccion_id: r.datos for r in RegistroSeccionPaciente.objects.filter(
+        paciente=paciente, seccion_id__in=ids, vigente=True)}
+
+
+def lectura_ficha(paciente, codigo_especialidad):
+    """[(item, [(campo, texto)])] de la ficha de la especialidad, sin secciones vacías."""
+    items = items_ficha(codigo_especialidad)
+    datos = datos_ficha(paciente, items)
+    salida = []
+    for item in items:
+        valores = datos.get(item['seccion_id']) or {}
+        filas = [(c, esquemas.texto_valor(c, valores.get(c['clave']))) for c in item['campos']
+                 if c['tipo'] not in esquemas.TIPOS_SIN_DATO and valores.get(c['clave']) not in (None, '', [])]
+        if filas:
+            salida.append((item, filas))
+    return salida
+
+
+@transaction.atomic
+def guardar_ficha(paciente, items, datos_por_seccion):
+    """Guarda la ficha desde la página del paciente (cada cambio deja una versión nueva, igual que en consulta)."""
+    for item in items:
+        if item['seccion_id'] in datos_por_seccion:
+            _guardar_paciente(None, item, _sin_vacios(datos_por_seccion[item['seccion_id']]), paciente=paciente)
+
+
 # ── Guardar ───────────────────────────────────────────────────────────────────
 
 def _sin_vacios(datos):
     return {k: v for k, v in (datos or {}).items() if v not in (None, '', [], {})}
 
 
-def _guardar_paciente(consulta, item, datos):
-    paciente = consulta.paciente
+def _guardar_paciente(consulta, item, datos, paciente=None):
+    paciente = paciente or consulta.paciente
     if item['codigo'] == ANTECEDENTES:
         base, _ = AntecedenteBase.objects.get_or_create(paciente=paciente)
         cambios = [c for c in CAMPOS_ANTECEDENTES if (datos.get(c) or '') != getattr(base, c)]
@@ -315,14 +355,19 @@ def _entero(valor):
 
 
 def sincronizar_signos(consulta, datos):
-    if not datos:
+    item = next((i for i in consulta.estructura if i['codigo'] == 'nucleo.signos_vitales'), None)
+    claves = {c['clave'] for c in item['campos']} if item else set()
+    antropometria_aparte = item is not None and 'peso_kg' not in claves     # p. ej. pediatría: va en su sección
+    if not datos and not antropometria_aparte:
         SignosVitales.objects.filter(consulta=consulta).delete()
         return
+    medidas = {} if antropometria_aparte else {
+        'peso_kg': _decimal(datos.get('peso_kg')), 'talla_cm': _decimal(datos.get('talla_cm')),
+        'imc': _decimal(datos.get('imc'))}
     SignosVitales.objects.update_or_create(consulta=consulta, defaults={
         'tenant': consulta.tenant, 'paciente': consulta.paciente,
-        'fecha': timezone.localtime(consulta.fecha_hora).date(),
-        'peso_kg': _decimal(datos.get('peso_kg')), 'talla_cm': _decimal(datos.get('talla_cm')),
-        'imc': _decimal(datos.get('imc')), 'pa_sistolica': _entero(datos.get('pa_sistolica')),
+        'fecha': timezone.localtime(consulta.fecha_hora).date(), **medidas,
+        'pa_sistolica': _entero(datos.get('pa_sistolica')),
         'pa_diastolica': _entero(datos.get('pa_diastolica')), 'fc': _entero(datos.get('fc')),
         'fr': _entero(datos.get('fr')), 'temperatura': _decimal(datos.get('temperatura')),
         'spo2': _entero(datos.get('spo2')), 'glicemia': _entero(datos.get('glicemia')),

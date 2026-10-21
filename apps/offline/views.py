@@ -35,6 +35,7 @@ def precache(request):
     manana = hoy + timedelta(days=1)
     perfil = membresia.perfil_activo
     agenda = reverse('agenda:dia')
+    paginas_esp = _paginas_de_especialidad(perfil)
     urls = [reverse('core:inicio'), agenda, f'{agenda}?fecha={manana.isoformat()}', reverse('pacientes:lista')]
     if tiene_permiso(request, 'agenda.ver'):
         citas = (Cita.objects.filter(fecha__range=(hoy, manana), estado__in=Cita.ACTIVAS)
@@ -48,6 +49,9 @@ def precache(request):
             if cita.paciente_id not in vistos:
                 vistos.add(cita.paciente_id)
                 urls.append(reverse('pacientes:detalle', args=[cita.paciente_id]))
+                urls.extend(reverse(n, args=[cita.paciente_id]) if n != 'ficha' else
+                            reverse('clinica:ficha_especialidad', args=[cita.paciente_id, perfil.especialidad.codigo])
+                            for n in paginas_esp)
             if perfil is not None and tiene_permiso(request, 'consultas.crear'):
                 urls.append(f"{reverse('clinica:consulta_nueva', args=[cita.paciente_id])}?cita={cita.pk}")
     if perfil is not None:
@@ -57,3 +61,14 @@ def precache(request):
     urls = list(dict.fromkeys(urls))[:MAX_URLS]
     auditoria.registrar(request, 'VER', 'offline', detalle=f'Precarga sin conexión: {len(urls)} páginas')
     return JsonResponse({'urls': urls})
+
+
+def _paginas_de_especialidad(perfil):
+    """Ficha de la especialidad y páginas del módulo (p. ej. vacunas) para los pacientes citados."""
+    if perfil is None or perfil.especialidad_id is None:
+        return []
+    from apps.clinica import registro
+    from apps.clinica.consultas import items_ficha
+    esp = registro.especialidad(perfil.especialidad.codigo)
+    paginas = ['ficha'] if items_ficha(perfil.especialidad.codigo) else []
+    return paginas + (list(esp.paginas_paciente) if esp else [])

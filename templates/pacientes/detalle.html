@@ -93,6 +93,21 @@
         {% else %}<span class="text-muted">Sin antecedentes registrados.</span>{% endif %}
       </div>
     </div>
+    {% for f in fichas_especialidad %}
+    <div class="card mb-3 om-ficha-especialidad"><div class="card-header bg-white fw-semibold d-flex justify-content-between">Ficha de {{ f.nombre|lower }}
+      <a href="{% url 'clinica:ficha_especialidad' paciente.pk f.codigo %}" class="small">{% if f.lectura %}Ver / editar{% else %}Completar{% endif %}</a></div>
+      {% if f.lectura %}
+      <div class="card-body small py-2">
+        {% for item, filas in f.lectura %}
+          <details {% if forloop.first %}open{% endif %} class="mb-1"><summary class="fw-semibold">{{ item.nombre }}</summary>
+            <dl class="row mb-1 mt-1">{% for c, texto in filas %}<dt class="col-sm-5 fw-normal text-muted">{{ c.etiqueta }}</dt><dd class="col-sm-7 mb-1">{{ texto|linebreaksbr }}</dd>{% endfor %}</dl>
+          </details>
+        {% endfor %}
+      </div>
+      {% else %}<div class="card-body small text-muted py-2">Sin completar. Puedes llenarla aquí o dentro de la primera consulta.</div>{% endif %}
+    </div>
+    {% endfor %}
+    {% for p in paneles_especialidad %}{% include p.def.plantilla with panel=p.ctx %}{% endfor %}
     <div class="card mb-3"><div class="card-header bg-white fw-semibold d-flex justify-content-between">Consultas <span class="small text-muted fw-normal">{{ consultas|length }}{% if ocultas %} · {{ ocultas }} de otros médicos no visibles{% endif %}</span></div>
       <div class="list-group list-group-flush">
         {% for c in consultas %}

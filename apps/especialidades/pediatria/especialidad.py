@@ -3,9 +3,10 @@ Pediatría (Fase 13, ADR-034): reemplaza a la especialidad «básica» del mismo
 Ver docs/roadmap/13_pediatria.md.
 """
 from apps.clinica import registro
-from apps.clinica.registro import EspecialidadDef, PlantillaDef
+from apps.clinica.registro import EspecialidadDef, PanelDef, PlantillaDef, ReporteDef
 
 from .calculos import CALCULOS
+from .documentos import DOCUMENTOS
 from .secciones import CONSULTA, FICHA
 
 # En pediatría peso y talla van en «Antropometría» (con percentiles): se ocultan de los signos vitales del núcleo.
@@ -13,30 +14,47 @@ SIGNOS_PEDIATRICOS = ('nucleo.signos_vitales', {'ajustes': {'ocultos': [
     'peso_kg', 'talla_cm', 'imc', 'superficie_corporal', 'glicemia', 'perimetro_abdominal']}})
 FICHA_COLAPSADA = [(s.codigo, {'colapsada': True}) for s in FICHA]
 
-PRIMERA = ['nucleo.motivo', 'nucleo.antecedentes', *FICHA_COLAPSADA, SIGNOS_PEDIATRICOS, 'ped.antropometria',
-           'ped.habitos', 'ped.desarrollo', 'nucleo.examen_fisico', 'nucleo.paraclinicos',
-           ('nucleo.diagnosticos', {'obligatoria': True}), 'nucleo.plan', 'nucleo.prescripcion', 'nucleo.ordenes']
-CONTROL_SANO = ['nucleo.motivo', SIGNOS_PEDIATRICOS, 'ped.antropometria', 'ped.habitos', 'ped.desarrollo',
-                'nucleo.examen_fisico', ('nucleo.diagnosticos', {'obligatoria': True}), 'nucleo.plan',
-                'nucleo.prescripcion']
-ENFERMEDAD = ['nucleo.motivo', SIGNOS_PEDIATRICOS, 'ped.antropometria', 'nucleo.examen_fisico',
-              'nucleo.paraclinicos', ('nucleo.diagnosticos', {'obligatoria': True}), 'nucleo.plan',
-              'nucleo.prescripcion', 'nucleo.ordenes']
-SEGUIMIENTO = ['nucleo.motivo', SIGNOS_PEDIATRICOS, ('ped.antropometria', {'colapsada': True}),
-               'nucleo.examen_fisico', ('nucleo.diagnosticos', {'obligatoria': True}), 'nucleo.plan',
-               'nucleo.prescripcion']
+# Igual que la consulta de Pediae: tipo · antropometría · signos · motivo y enfermedad actual · examen físico ·
+# desarrollo · diagnóstico · tratamiento e indicaciones (+ próxima cita) · récipe · paraclínicos · hábitos.
+CONSULTA_PEDIAE = ['ped.tipo', 'ped.antropometria', SIGNOS_PEDIATRICOS, 'nucleo.motivo', 'nucleo.examen_fisico',
+                   'ped.desarrollo', ('nucleo.diagnosticos', {'obligatoria': True}), 'nucleo.plan',
+                   'nucleo.prescripcion', 'nucleo.ordenes', 'ped.habitos']
+PRIMERA = ['ped.tipo', 'nucleo.motivo', 'nucleo.antecedentes', *FICHA_COLAPSADA, 'ped.antropometria',
+           SIGNOS_PEDIATRICOS, 'nucleo.examen_fisico', 'ped.desarrollo', 'nucleo.paraclinicos',
+           ('nucleo.diagnosticos', {'obligatoria': True}), 'nucleo.plan', 'nucleo.prescripcion', 'nucleo.ordenes',
+           'ped.habitos']
+CONTROL_SANO = ['ped.tipo', 'ped.antropometria', SIGNOS_PEDIATRICOS, 'nucleo.motivo', 'ped.habitos',
+                'ped.desarrollo', 'nucleo.examen_fisico', ('nucleo.diagnosticos', {'obligatoria': True}),
+                'nucleo.plan', 'nucleo.prescripcion']
 
 PLANTILLAS = [
-    PlantillaDef('Primera consulta pediátrica', PRIMERA, predeterminada=True,
-                 descripcion='Ficha pediátrica completa, antropometría con percentiles OMS, hábitos y desarrollo.'),
-    PlantillaDef('Control de niño sano', CONTROL_SANO, descripcion='Crecimiento, hábitos y desarrollo.'),
-    PlantillaDef('Consulta por enfermedad', ENFERMEDAD),
-    PlantillaDef('Seguimiento', SEGUIMIENTO),
+    PlantillaDef('Consulta pediátrica', CONSULTA_PEDIAE, predeterminada=True,
+                 descripcion='Igual que en Pediae. La ficha pediátrica se llena en la ficha del paciente.'),
+    PlantillaDef('Primera consulta con ficha completa', PRIMERA,
+                 descripcion='Incluye toda la ficha pediátrica dentro de la consulta.'),
+    PlantillaDef('Control de niño sano', CONTROL_SANO, descripcion='Crecimiento, hábitos y desarrollo primero.'),
 ]
+
+
+
+def _panel(nombre):
+    def contexto(request, paciente):
+        from . import paneles
+        return getattr(paneles, nombre)(request, paciente)
+    return contexto
+
 
 registro.registrar(EspecialidadDef(
     codigo='pediatria', nombre='Pediatría', modulo='apps.especialidades.pediatria', icono='bi-balloon-heart',
     color='#2AACA8', orden=21, secciones=[*FICHA, *CONSULTA], calculos=CALCULOS, plantillas=PLANTILLAS,
+    documentos=DOCUMENTOS,
+    paneles=[PanelDef('ped_crecimiento', 'Crecimiento', 'pediatria/panel_crecimiento.html', _panel('crecimiento'),
+                      orden=10),
+             PanelDef('ped_vacunas', 'Vacunas y pesquisas', 'pediatria/panel_vacunas.html',
+                      _panel('vacunas_pesquisas'), orden=20)],
+    reportes=[ReporteDef('ped_reporte', 'Reporte pediátrico', 'pediatria:reporte', icono='bi-balloon-heart',
+                         descripcion='Estado nutricional, edades, vacunas, lactancia, antecedentes y pesquisas.')],
+    paginas_paciente=['pediatria:vacunas'],
 ))
 
 

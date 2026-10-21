@@ -22,6 +22,7 @@ RESERVADOS = {
     'consultas', 'clinica', 'historia', 'plantillas', 'secciones', 'documentos', 'reportes', 'plataforma',
     'salud', 'offline', 'instalar', 'visor', 'static', 'media', 'favicon.ico', 'manifest.webmanifest', 'sw.js',
     '__debug__', 'omnis', 'www', 'app', 'soporte', 'ayuda', 'login', 'entrar', 'dictado', 'cie10', 'adjuntos', 'citas',
+    'esp',
 }
 PATRON = re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
 

@@ -16,6 +16,11 @@
 
 ---
 
+### Fase 13 Pediatría — avance (2026-10-21, fase abierta)
+- Hecho: perfil por especialidad (paneles, reportes, rutas y páginas offline por módulo), ficha pediátrica en página propia, curvas OMS SVG/PDF, vacunas (35 dosis, anual) y pesquisas, constancias pediátricas, reporte pediátrico + Excel, glosario de medicamentos con calculadora de dosis en el récipe (núcleo).
+- Verificado: 169 tests (SQLite + PostgreSQL), ruff limpio, `makemigrations --check`, capturas escritorio y móvil.
+- ADR: 034, 035, 036, 037.
+
 ### Panel de suscripciones (2026-10-21)
 - Hecho: planes en el panel, días de gracia (plan + consultorio), anular la última renovación con motivo, tablero de suscripciones, navegación del panel, registro de accesos de soporte (también en la auditoría del consultorio) y aviso de gracia al equipo.
 - Verificado: 128 tests (SQLite + PostgreSQL), ruff limpio, capturas del panel.

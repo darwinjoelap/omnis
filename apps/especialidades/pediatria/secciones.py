@@ -145,6 +145,13 @@ ENTORNO = SeccionDef('ped.entorno', 'Familia, hábitos y entorno', ambito='PACIE
 
 # ── Consulta ─────────────────────────────────────────────────────────────────
 
+TIPOS_CONSULTA = [['CONTROL_SANO', 'Control sano'], ['ENFERMEDAD', 'Consulta por enfermedad'],
+                  ['SEGUIMIENTO', 'Seguimiento']]
+TIPO = SeccionDef('ped.tipo', 'Tipo de consulta', orden=5, esquema={'campos': [
+    {'clave': 'tipo', 'tipo': 'opcion', 'etiqueta': 'Tipo de consulta', 'ancho': 6, 'opciones': TIPOS_CONSULTA,
+     'por_defecto': 'CONTROL_SANO'},
+]})
+
 ANTROPOMETRIA = SeccionDef('ped.antropometria', 'Antropometría y crecimiento (OMS)', orden=41, esquema={'campos': [
     {'clave': 'peso_kg', 'tipo': 'numero', 'etiqueta': 'Peso', 'unidad': 'kg', 'min': 0.3, 'max': 200,
      'decimales': 3, 'ancho': 3},
@@ -204,4 +211,4 @@ DESARROLLO = SeccionDef('ped.desarrollo', 'Desarrollo psicomotor', orden=43, esq
 ]})
 
 FICHA = [PERINATALES, ALIMENTACION, DESARROLLO_HITOS, PATOLOGICOS, FAMILIARES, ENTORNO]
-CONSULTA = [ANTROPOMETRIA, HABITOS, DESARROLLO]
+CONSULTA = [TIPO, ANTROPOMETRIA, HABITOS, DESARROLLO]
