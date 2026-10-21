@@ -51,7 +51,23 @@ def dia(request):
     return render(request, 'agenda/dia.html', {
         'titulo': 'Agenda', 'fecha': fecha, 'anterior': fecha - timedelta(days=1), 'siguiente': fecha + timedelta(days=1),
         'hoy': srv.hoy(), 'profesionales': profesionales, 'elegido': elegido, 'columnas': columnas,
-        'bloqueos': Bloqueo.objects.filter(desde__date__lte=fecha, hasta__date__gte=fecha)})
+        'bloqueos': Bloqueo.objects.filter(desde__date__lte=fecha, hasta__date__gte=fecha),
+        'cumpleanos': srv.cumpleanos(fecha, request.membresia)})
+
+
+@login_required
+@requiere('agenda.ver')
+def horas(request):
+    """Panel de horas del día para el formulario de cita (HTMX)."""
+    from apps.equipo.models import PerfilProfesional
+    fecha = srv.fecha_de(request.GET.get('fecha'))
+    profesional = PerfilProfesional.objects.filter(pk=request.GET.get('profesional') or 0).first()
+    if profesional is None:
+        return render(request, 'agenda/_horas.html', {'sin_profesional': True})
+    excluir = request.GET.get('excluir')
+    return render(request, 'agenda/_horas.html', {
+        'fecha': fecha, 'profesional': profesional,
+        **srv.horas_del_dia(profesional, fecha, excluir=int(excluir) if (excluir or '').isdigit() else None)})
 
 
 @login_required

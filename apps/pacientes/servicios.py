@@ -26,13 +26,18 @@ def buscar_duplicado(*, tipo_documento, numero_documento, nombres, apellidos, fe
     return None
 
 
-def _validar_representante(paciente, representante):
+def aviso_representante(paciente, representante):
+    """
+    Como en Pediae, ni la cédula ni el representante son obligatorios (en consulta se registra rápido y se completa
+    después). Solo se avisa cuando un menor sin documento queda sin representante identificable.
+    """
     sin_documento = not paciente.numero_documento or paciente.tipo_documento == Paciente.TipoDocumento.NINGUNO
     if paciente.es_menor and sin_documento:
         if representante is None or not representante.nombre.strip():
-            raise ErrorDeNegocio('Un menor sin documento necesita un representante.')
+            return 'Menor sin documento y sin representante: conviene registrarlo para los recordatorios y documentos.'
         if not representante.numero_documento.strip():
-            raise ErrorDeNegocio('Indica el documento del representante del menor sin documento.')
+            return 'Falta la cédula del representante (sale en constancias y documentos).'
+    return None
 
 
 @transaction.atomic
@@ -44,8 +49,8 @@ def crear_paciente(*, paciente: Paciente, representante: Representante | None = 
                                  fecha_nacimiento=paciente.fecha_nacimiento)
     if duplicado:
         raise PacienteDuplicado(duplicado)
-    _validar_representante(paciente, representante)
     paciente.save()
+    paciente.aviso = aviso_representante(paciente, representante)
     if representante is not None and representante.nombre.strip():
         representante.paciente = paciente
         representante.es_principal = True
@@ -61,8 +66,8 @@ def actualizar_paciente(*, paciente: Paciente) -> Paciente:
                                  fecha_nacimiento=paciente.fecha_nacimiento, excluir_pk=paciente.pk)
     if duplicado:
         raise PacienteDuplicado(duplicado)
-    _validar_representante(paciente, paciente.representante_principal)
     paciente.save()
+    paciente.aviso = aviso_representante(paciente, paciente.representante_principal)
     return paciente
 
 
@@ -81,9 +86,6 @@ def guardar_representante(*, paciente: Paciente, representante: Representante) -
 def eliminar_representante(*, representante: Representante) -> None:
     paciente = representante.paciente
     otros = paciente.representantes.exclude(pk=representante.pk)
-    sin_documento = not paciente.numero_documento
-    if paciente.es_menor and sin_documento and not otros.exists():
-        raise ErrorDeNegocio('Un menor sin documento debe conservar al menos un representante.')
     era_principal = representante.es_principal
     representante.delete()
     if era_principal and otros.exists():

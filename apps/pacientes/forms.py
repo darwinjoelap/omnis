@@ -20,10 +20,11 @@ class PacienteForm(FormBase, forms.ModelForm):
 
     def clean(self):
         datos = super().clean()
-        tipo, numero = datos.get('tipo_documento'), (datos.get('numero_documento') or '').strip()
-        if tipo and tipo != Paciente.TipoDocumento.NINGUNO and not numero:
-            self.add_error('numero_documento', 'Indica el número o elige «Sin documento».')
-        if tipo == Paciente.TipoDocumento.NINGUNO:
+        numero = (datos.get('numero_documento') or '').strip()
+        if not numero:                      # la cédula no es obligatoria (como en Pediae): sin número = sin documento
+            datos['tipo_documento'] = Paciente.TipoDocumento.NINGUNO
+            self.instance.tipo_documento = Paciente.TipoDocumento.NINGUNO
+        if datos.get('tipo_documento') == Paciente.TipoDocumento.NINGUNO:
             datos['numero_documento'] = ''
         from django.utils import timezone
         fn = datos.get('fecha_nacimiento')

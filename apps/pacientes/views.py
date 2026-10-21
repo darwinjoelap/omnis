@@ -62,6 +62,8 @@ def nuevo(request):
         else:
             auditoria.registrar(request, 'CREAR', paciente, paciente_id=paciente.pk)
             messages.success(request, f'Paciente registrado: {paciente}.')
+            if paciente.aviso:
+                messages.info(request, paciente.aviso)
             siguiente = request.POST.get('next') or ''
             if siguiente.startswith('/') and not siguiente.startswith('//'):
                 return redirect(f'{siguiente}{"&" if "?" in siguiente else "?"}paciente={paciente.pk}')
@@ -112,6 +114,8 @@ def editar(request, pk):
         else:
             auditoria.registrar(request, 'EDITAR', paciente, paciente_id=paciente.pk)
             messages.success(request, 'Datos del paciente guardados.')
+            if getattr(form.instance, 'aviso', None):
+                messages.info(request, form.instance.aviso)
             return redirect('pacientes:detalle', pk=pk)
     return render(request, 'pacientes/form.html', {
         'titulo': f'Editar · {paciente}', 'form': form, 'paciente': paciente, 'duplicado': duplicado})

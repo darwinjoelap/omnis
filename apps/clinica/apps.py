@@ -3,8 +3,9 @@ from django.db.models.signals import post_migrate
 
 
 def _sincronizar(sender, **kwargs):
-    from .servicios import sincronizar_catalogo
+    from .servicios import actualizar_plantillas_de_modulos, sincronizar_catalogo
     sincronizar_catalogo(verbosidad=kwargs.get('verbosity', 1))
+    actualizar_plantillas_de_modulos()
 
 
 class ClinicaConfig(AppConfig):

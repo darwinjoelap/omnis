@@ -175,9 +175,55 @@ def turnos_libres(profesional, fecha):
     return libres
 
 
+def horas_del_dia(profesional, fecha, excluir=None):
+    """
+    Panel de horas al agendar (de Pediae): todos los turnos del día según el horario del profesional, marcando los
+    ocupados (con el paciente) y los ya pasados si es hoy. Sin horario cargado ese día, turnos de 30 min de
+    7:00 a. m. a 6:00 p. m. (como Pediae) y `sin_horario=True`. También devuelve las citas sin hora (tentativas).
+    """
+    qs = Cita.objects.filter(profesional=profesional, fecha=fecha, estado__in=Cita.ACTIVAS).select_related('paciente')
+    if excluir:
+        qs = qs.exclude(pk=excluir)
+    citas = list(qs)
+    con_hora = [c for c in citas if c.hora_inicio]
+    horarios = list(HorarioAtencion.objects.filter(profesional=profesional, dia_semana=fecha.weekday(), activo=True)
+                    .select_related('lugar').order_by('hora_inicio'))
+    tramos = [(h.hora_inicio, h.hora_fin, h.duracion_turno_min, h.lugar) for h in horarios]
+    if not tramos:
+        tramos = [(time(7), time(18), 30, None)]
+    ahora = timezone.localtime().time() if fecha == timezone.localdate() else None
+    turnos = []
+    for ini_t, fin_t, minutos, lugar in tramos:
+        actual, fin, paso = datetime.combine(fecha, ini_t), datetime.combine(fecha, fin_t), timedelta(minutes=minutos)
+        while actual + paso <= fin:
+            ini, ter = actual.time(), (actual + paso).time()
+            ocupada = next((c for c in con_hora
+                            if c.hora_inicio < ter and (c.hora_fin or (datetime.combine(fecha, c.hora_inicio)
+                                                                       + paso).time()) > ini), None)
+            turnos.append({'hora': ini, 'lugar': lugar, 'cita': ocupada, 'pasada': ahora is not None and ini <= ahora})
+            actual += paso
+    return {'turnos': turnos, 'sin_horario': not horarios, 'tentativas': [c for c in citas if not c.hora_inicio]}
+
+
 def semana_de(fecha):
     lunes = fecha - timedelta(days=fecha.weekday())
     return [lunes + timedelta(days=i) for i in range(7)]
+
+
+def numero_whatsapp(telefono):
+    """Teléfono venezolano → número para wa.me (0414… → 58414…). Vacío si no hay número."""
+    numero = re.sub(r'[^\d+]', '', telefono or '').lstrip('+')
+    if numero.startswith('0'):
+        numero = '58' + numero[1:]
+    return numero if len(numero) >= 10 else ''
+
+
+def destinatario(paciente):
+    """(saludo, teléfono): si es menor y tiene representante con teléfono, se le escribe y se le saluda a él."""
+    representante = paciente.representante_principal if paciente.es_menor else None
+    if representante is not None and representante.telefono:
+        return representante.nombre.split()[0], representante.telefono, representante
+    return paciente.nombres.split()[0], paciente.telefono, None
 
 
 def url_whatsapp(cita):
@@ -185,12 +231,9 @@ def url_whatsapp(cita):
     paciente = cita.paciente
     representante = paciente.representante_principal if paciente.es_menor else None
     telefono = (representante.telefono if representante and representante.telefono else '') or paciente.telefono
-    numero = re.sub(r'[^\d+]', '', telefono or '')
+    numero = numero_whatsapp(telefono)
     if not numero:
         return None
-    if numero.startswith('0'):
-        numero = '58' + numero[1:]
-    numero = numero.lstrip('+')
     config = cita.tenant.configuracion
     saludo = (representante.nombre if representante else paciente.nombres).split()[0]
     cuando = f'el {cita.fecha:%d/%m/%Y}' + (f' a las {hora12(cita.hora_inicio)}' if cita.hora_inicio else '')
@@ -217,3 +260,73 @@ def fecha_de(texto, por_defecto=None):
         return date.fromisoformat(texto)
     except (TypeError, ValueError):
         return por_defecto or hoy()
+
+
+def programar_control(consulta, fecha):
+    """
+    «Próximo control» de una consulta → cita TENTATIVA sin hora (comportamiento de Pediae): mismo profesional y lugar,
+    motivo «Control – diagnóstico». Al volver a guardar se mueve la misma cita; si se borra la fecha, se quita la
+    tentativa que aún no tiene hora. No duplica si ya hay una cita activa del paciente con ese profesional ese día.
+    Devuelve la cita (o None).
+    """
+    from apps.clinica.models import DiagnosticoConsulta
+    existente = (Cita.objects.filter(consulta_origen=consulta, estado__in=Cita.ACTIVAS)
+                 .order_by('-creado_en').first())
+    dia_consulta = timezone.localtime(consulta.fecha_hora).date() if consulta.fecha_hora else hoy()
+    if not fecha or fecha <= dia_consulta:
+        if existente is not None and existente.estado == Cita.Estado.TENTATIVA and existente.hora_inicio is None:
+            existente.delete()
+        return None
+    if existente is not None:
+        if existente.fecha != fecha:
+            existente.fecha = fecha
+            existente.hora_inicio = existente.hora_fin = None      # la hora asignada era para el otro día
+            existente.estado = Cita.Estado.TENTATIVA
+            existente.save(update_fields=['fecha', 'hora_inicio', 'hora_fin', 'estado', 'actualizado_en'])
+        return existente
+    otra = Cita.objects.filter(paciente=consulta.paciente, profesional=consulta.profesional, fecha=fecha,
+                               estado__in=Cita.ACTIVAS).first()
+    if otra is not None:
+        return otra
+    diagnostico = (DiagnosticoConsulta.objects.filter(consulta=consulta).order_by('pk')
+                   .values_list('descripcion', flat=True).first() or '')
+    motivo = f'Control – {diagnostico}' if diagnostico else 'Control'
+    return Cita.objects.create(
+        paciente=consulta.paciente, profesional=consulta.profesional, especialidad=consulta.especialidad,
+        lugar=consulta.lugar, fecha=fecha, hora_inicio=None, hora_fin=None, estado=Cita.Estado.TENTATIVA,
+        motivo=motivo[:200], consulta_origen=consulta)
+
+
+def cumpleanos(fecha, membresia=None):
+    """
+    Pacientes que cumplen años en `fecha` (de Pediae), con el enlace para felicitarlos por WhatsApp. Si es menor se
+    saluda al representante y se le escribe a él. El profesional ve los suyos (ADR-029). Los nacidos un 29/02
+    aparecen el 28/02 en los años no bisiestos.
+    """
+    import calendar
+
+    from apps.pacientes.models import Paciente
+    from apps.pacientes.selectors import filtrar_propios, puede_ver_todos
+    qs = Paciente.objects.filter(activo=True, fecha_nacimiento__month=fecha.month, fecha_nacimiento__day=fecha.day)
+    if fecha.month == 2 and fecha.day == 28 and not calendar.isleap(fecha.year):
+        qs = Paciente.objects.filter(activo=True, fecha_nacimiento__month=2, fecha_nacimiento__day__in=(28, 29))
+    if membresia is not None and not puede_ver_todos(membresia):
+        qs = filtrar_propios(qs, membresia)
+    config = membresia.tenant.configuracion if membresia is not None else None
+    consultorio = config.nombre_display if config else 'el consultorio'
+    salida = []
+    for p in qs.prefetch_related('representantes').order_by('nombres', 'apellidos'):
+        edad = fecha.year - p.fecha_nacimiento.year
+        anios = f'{edad} año{"s" if edad != 1 else ""}'
+        saludo, telefono, representante = destinatario(p)
+        if representante is not None:
+            texto = (f'¡Hola {saludo}! El equipo de {consultorio} le desea a {p.nombres.split()[0]} un muy feliz '
+                     f'cumpleaños: hoy cumple {anios}. ¡Que pase un día excelente!')
+        else:
+            texto = (f'¡Hola {saludo}! El equipo de {consultorio} le desea un muy feliz cumpleaños. '
+                     f'¡Que pase un día excelente!')
+        numero = numero_whatsapp(telefono)
+        salida.append({'paciente': p, 'edad': edad, 'para': representante,
+                       'url': f'https://wa.me/{numero}?text={urllib.parse.quote(texto)}' if numero else None})
+    return salida
+

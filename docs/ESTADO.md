@@ -4,7 +4,7 @@
 > Menos de 100 líneas: el detalle de fases cerradas va a `HISTORIAL.md`; las decisiones, a `DECISIONES.md`.
 
 **Última actualización:** 2026-10-21
-**Fase actual:** 12 cerrada + panel de suscripciones (ADR-033) → siguiente **13/14 módulo de especialidad** (Pediatría o Ginecología) o Railway staging
+**Fase actual:** 13 Pediatría **en curso** (13.1–13.3 hechas; ver `roadmap/13_pediatria.md`) → siguiente 13.4 curvas de crecimiento
 **Repositorio:** `github.com/darwinjoelap/omnis` (privado), rama `main` — código en `C:\proyectos\omnis`
 **Último commit:** `5d230b8` Fase 12 (pusheado 2026-10-20) · entorno local: `venv\Scripts\Activate.ps1` (carpeta `venv`, no `.venv`)
 **Staging / producción:** pendientes (Railway no creado)
@@ -24,12 +24,13 @@
 - [x] 10 Documentos PDF: récipe (2 columnas), informe, referencia, reposo, constancia, recibo
 - [x] 11 Reportes: tablero con filtros, morbilidad CIE-10, agenda, ingresos, por profesional; PDF y Excel (ADR-031)
 - [x] 12 PWA offline de consulta: borradores, cola con idempotencia, precarga y copias de agenda/fichas, consulta nueva sin red (ADR-032)
+- [~] 13 Pediatría: ajustes de Pediae en el núcleo (ADR-035), ficha pediátrica, antropometría con percentiles OMS 0–19 años (ADR-034), plantillas · faltan 13.4–13.10
 - [x] Panel de suscripciones: planes, días de gracia, anular renovación, tablero, registro de accesos de soporte (ADR-033)
 - [x] Perfil del médico estilo Pediae: logo/marca de agua, banner, firma y sello fijos al pie (ADR-030)
 - [x] Alcance de pacientes por rol (ADR-029): médico ve los suyos; asistente/titular ven todo; configurable
 - [x] Marca **Omnis** (ADR-028): logo, paleta, fuentes locales, login en dos paneles, inicio con cifras del día
 
-**Verificación:** 128 tests en verde en SQLite y PostgreSQL 16 · `ruff` limpio · `makemigrations --check` limpio ·
+**Verificación:** 147 tests en verde en SQLite y PostgreSQL 16 · `ruff` limpio · `makemigrations --check` limpio ·
 E2E con navegador: paciente → consulta → cierre → PDF; offline (servidor apagado): copia de agenda, consulta nueva en cola, sincroniza al volver.
 
 ## Pendiente inmediato
@@ -53,7 +54,10 @@ E2E con navegador: paciente → consulta → cierre → PDF; offline (servidor a
 - Suscripciones: sin aviso por correo antes de vencer (solo dentro de la app); sin descuentos ni prueba gratuita; el ingreso mensual estimado usa el precio de lista del plan.
 - Railway con problemas (2026-10-21): se avanza en lo que no depende del despliegue.
 
+- Pediatría: los percentiles se ven al guardar (sin vista previa en vivo); la ficha pediátrica se edita dentro de la consulta (falta página propia en la ficha del paciente).
+
 ## Preguntas abiertas
+- [ ] Pediatra: ¿qué criterio nutricional ve primero (peso/edad como Pediae u OMS IMC/edad)? ¿cuál va en la constancia de niño sano?
 - [ ] ¿Qué especialidad lleva el primer médico real a producción (13 ó 14)?
 - [ ] ¿Migrar tenants de Ginea/Pediae (Fase 18)?
 - [ ] Precio y planes (¿por profesional? ¿dictado como complemento?)

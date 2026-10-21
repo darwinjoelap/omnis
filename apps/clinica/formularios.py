@@ -69,6 +69,7 @@ class FormularioSeccion(forms.Form):
         self.contexto = contexto or {}
         guardados = initial or {}
         super().__init__(*args, **kwargs)
+        self.guardados = guardados
         self.tablas = {}
         for c in campos:
             if c['tipo'] == 'tabla':
@@ -106,6 +107,12 @@ class FormularioSeccion(forms.Form):
         for c in campos:              # atributos para el JS de visible_si y la vista previa de calculados
             if c['clave'] in self.fields and c.get('visible_si'):
                 self.fields[c['clave']].widget.attrs['data-visible-si'] = _json(c['visible_si'])
+
+    @property
+    def calculados(self):
+        """Valores de los campos calculados: lo recién validado o, si no, lo que ya estaba guardado."""
+        fuente = getattr(self, 'datos_limpios', None) or self.guardados
+        return {c['clave']: fuente.get(c['clave']) for c in self.campos_def if c['tipo'] == 'calculado'}
 
     def _filas_enviadas(self, c):
         prefijo = self.add_prefix(f'{c["clave"]}__')

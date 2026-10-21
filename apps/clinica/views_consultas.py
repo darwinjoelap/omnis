@@ -4,6 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.utils.html import format_html_join
 from django.views.decorators.http import require_POST
 
@@ -39,6 +40,15 @@ def _formularios(consulta, data=None):
                                  prefix=f's{item["seccion_id"]}', contexto=contexto, exigir_requeridos=False)
         formularios.append((item, form))
     return formularios
+
+
+def _aviso_control(request, consulta, desde):
+    """Avisa si al guardar se creó o movió la cita tentativa del próximo control."""
+    from apps.agenda.models import Cita
+    cita = Cita.objects.filter(consulta_origen=consulta, actualizado_en__gte=desde).order_by('-actualizado_en').first()
+    if cita is not None:
+        messages.info(request, f'Próximo control: cita tentativa (sin hora) el {cita.fecha:%d/%m/%Y}. '
+                               'La asistente le asigna la hora desde la agenda.')
 
 
 def _inicio(texto):
@@ -100,11 +110,13 @@ def nueva(request, paciente_pk):
             accion = request.POST.get('accion')
             if cita is not None and cita.consulta_id:
                 messages.warning(request, 'La cita ya tenía una consulta: esta se guardó aparte.')
+            desde = timezone.now()
             creada = srv.crear_consulta_completa(
                 paciente=paciente, profesional=perfil, plantilla=consulta.plantilla, tipo=tipo, lugar=lugar,
                 datos_por_seccion={item['seccion_id']: f.datos_limpios for item, f in formularios}, cita=cita,
                 fecha_hora=_inicio(request.POST.get('inicio')), cerrar=accion == 'cerrar', usuario=request.user)
             auditoria.registrar(request, 'CREAR', creada, paciente_id=paciente.pk)
+            _aviso_control(request, creada, desde)
             if creada.estado == Consulta.Estado.CERRADA:
                 messages.success(request, 'Consulta guardada y cerrada.')
                 return redirect('clinica:consulta', pk=creada.pk)
@@ -130,8 +142,10 @@ def editar(request, pk):
     formularios = _formularios(consulta, request.POST if request.method == 'POST' else None)
     if request.method == 'POST':
         if all(f.is_valid() for _, f in formularios):
+            desde = timezone.now()
             srv.guardar_secciones(consulta, {item['seccion_id']: f.datos_limpios for item, f in formularios})
             auditoria.registrar(request, 'EDITAR', consulta, paciente_id=consulta.paciente_id)
+            _aviso_control(request, consulta, desde)
             if request.POST.get('accion') == 'cerrar':
                 try:
                     srv.cerrar_consulta(consulta, request.user)

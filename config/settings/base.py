@@ -47,6 +47,7 @@ OMNIS_APPS = [
     'apps.offline',
     # Especialidades (módulos enchufables): agregar aquí + `sincronizar_especialidades`
     'apps.especialidades.general',
+    'apps.especialidades.pediatria',
 ]
 
 # apps.usuarios primero para que su `createsuperuser` reemplace al de Django

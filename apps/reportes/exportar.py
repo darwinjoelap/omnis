@@ -163,7 +163,7 @@ def excel(tenant, d, consultas):
     from django.utils import timezone
     detalle = hoja('Consultas', ['Fecha', 'Paciente', 'Documento', 'Profesional', 'Especialidad', 'Tipo', 'Estado',
                                  'Motivo', 'Diagnóstico'],
-                   [(timezone.localtime(c.fecha_hora).strftime('%d/%m/%Y %H:%M'), c.paciente.nombre_completo,
+                   [(timezone.localtime(c.fecha_hora).strftime('%d/%m/%Y %I:%M %p'), c.paciente.nombre_completo,
                      c.paciente.documento, c.profesional.nombre_con_titulo,
                      c.especialidad.nombre if c.especialidad_id else '', c.get_tipo_display(), c.get_estado_display(),
                      c.motivo, c.diagnostico) for c in consultas])

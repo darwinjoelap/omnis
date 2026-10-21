@@ -63,7 +63,8 @@ class Paciente(TenantModel, Auditable):
 
     nombres = models.CharField('Nombres', max_length=120)
     apellidos = models.CharField('Apellidos', max_length=120)
-    sexo = models.CharField('Sexo', max_length=1, choices=Sexo.choices)
+    sexo = models.CharField('Sexo', max_length=1, choices=Sexo.choices, blank=True,
+                            help_text='Opcional; hace falta para los percentiles de crecimiento.')
     fecha_nacimiento = models.DateField('Fecha de nacimiento', null=True, blank=True)
     tipo_documento = models.CharField('Tipo de documento', max_length=1, choices=TipoDocumento.choices,
                                       default=TipoDocumento.V)

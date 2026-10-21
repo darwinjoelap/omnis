@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from django.db import models
 from django.db.models import Q
 
+from apps.core.fechas import hora12
 from apps.core.tenancy import Auditable, TenantModel
 
 
@@ -37,7 +38,7 @@ class HorarioAtencion(TenantModel):
                                               name='horario_fin_mayor_inicio')]
 
     def __str__(self):
-        return f'{self.get_dia_semana_display()} {self.hora_inicio:%H:%M}–{self.hora_fin:%H:%M}'
+        return f'{self.get_dia_semana_display()} {hora12(self.hora_inicio)} – {hora12(self.hora_fin)}'
 
 
 class Bloqueo(TenantModel, Auditable):
@@ -114,6 +115,9 @@ class Cita(TenantModel, Auditable):
                                     help_text='Se agendó a propósito encima de otra cita.')
     consulta = models.OneToOneField('clinica.Consulta', on_delete=models.SET_NULL, null=True, blank=True,
                                     related_name='cita')
+    consulta_origen = models.ForeignKey('clinica.Consulta', on_delete=models.SET_NULL, null=True, blank=True,
+                                        related_name='controles', editable=False,
+                                        help_text='Consulta que indicó este control (próximo control).')
     recordatorio_en = models.DateTimeField('Recordatorio enviado', null=True, blank=True)
     motivo_cancelacion = models.CharField('Motivo de cancelación', max_length=200, blank=True)
 

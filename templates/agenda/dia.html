@@ -15,7 +15,19 @@
 </div>
 <h1 class="h4 mb-2">{{ fecha|date:"l j \d\e F"|lower|capfirst }}{% if fecha == hoy %} <span class="badge text-bg-light border align-middle">Hoy</span>{% endif %}</h1>
 <div class="mb-3">{% include 'agenda/_selector_profesional.html' %}</div>
-{% for b in bloqueos %}<div class="alert alert-secondary py-1 small"><i class="bi bi-slash-circle me-1"></i>Bloqueo{% if b.profesional %} de {{ b.profesional }}{% else %} de todo el consultorio{% endif %}: {{ b.motivo }} ({{ b.desde|date:"d/m H:i" }} – {{ b.hasta|date:"d/m H:i" }})</div>{% endfor %}
+{% for b in bloqueos %}<div class="alert alert-secondary py-1 small"><i class="bi bi-slash-circle me-1"></i>Bloqueo{% if b.profesional %} de {{ b.profesional }}{% else %} de todo el consultorio{% endif %}: {{ b.motivo }} ({{ b.desde|date:"d/m" }} {{ b.desde|hora12 }} – {{ b.hasta|date:"d/m" }} {{ b.hasta|hora12 }})</div>{% endfor %}
+{% if cumpleanos %}
+<div class="card mb-3 om-cumpleanos"><div class="card-body py-2">
+  <div class="small fw-semibold mb-1"><i class="bi bi-cake2 me-1"></i>Cumpleaños {% if fecha == hoy %}de hoy{% else %}del día{% endif %}</div>
+  <div class="d-flex flex-wrap gap-2">{% for c in cumpleanos %}
+    <div class="d-flex align-items-center gap-2 border rounded-3 px-2 py-1 bg-white">
+      <a href="{% url 'pacientes:detalle' c.paciente.pk %}" class="text-decoration-none">{{ c.paciente.nombre_completo }}</a>
+      <span class="small text-muted">{{ c.edad }} año{{ c.edad|pluralize }}</span>
+      {% if c.url %}<a href="{{ c.url }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-success py-0" title="Felicitar{% if c.para %} a {{ c.para.nombre }}{% endif %} por WhatsApp"><i class="bi bi-whatsapp me-1"></i>Felicitar</a>
+      {% else %}<span class="small text-muted" title="Sin teléfono registrado">sin teléfono</span>{% endif %}
+    </div>{% endfor %}</div>
+</div></div>
+{% endif %}
 <div class="row g-3">
   {% for col in columnas %}
   <div class="{% if columnas|length > 1 %}col-lg-6 col-xxl-4{% else %}col-lg-8{% endif %}">

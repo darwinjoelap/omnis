@@ -103,13 +103,16 @@ class PacientesTest(BaseTest):
         with self.en_tenant():
             self.assertEqual(Paciente.objects.count(), 1)
 
-    def test_menor_sin_documento_exige_representante(self):
+    def test_menor_sin_documento_ni_representante_se_registra_con_aviso(self):
         hace_3 = (timezone.localdate() - timedelta(days=365 * 3)).isoformat()
-        r = self.cliente.post('/pacientes/nuevo/', self.datos(fecha_nacimiento=hace_3, tipo_documento='N',
-                                                              numero_documento=''))
-        self.assertContains(r, 'necesita un representante')
+        r = self.cliente.post('/pacientes/nuevo/', self.datos(fecha_nacimiento=hace_3, tipo_documento='V',
+                                                              numero_documento='', sexo=''), follow=True)
+        self.assertContains(r, 'conviene registrarlo')
+        with self.en_tenant():
+            p = Paciente.objects.get()
+            self.assertEqual((p.tipo_documento, p.sexo), ('N', ''))
         r = self.cliente.post('/pacientes/nuevo/', self.datos(
-            fecha_nacimiento=hace_3, tipo_documento='N', numero_documento='', **{
+            nombres='Luz', fecha_nacimiento=hace_3, tipo_documento='N', numero_documento='', **{
                 'rep-nombre': 'Carla Gómez', 'rep-parentesco': 'MADRE', 'rep-tipo_documento': 'V',
                 'rep-numero_documento': '15000111'}))
         self.assertEqual(r.status_code, 302)

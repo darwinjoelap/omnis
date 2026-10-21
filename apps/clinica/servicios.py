@@ -50,6 +50,40 @@ def sincronizar_catalogo(verbosidad=1):
         .update(activa=False)
 
 
+def actualizar_plantillas_de_modulos():
+    """
+    Tras instalar o actualizar un módulo de especialidad (post_migrate): los consultorios que ya tenían esa
+    especialidad reciben las plantillas nuevas del módulo. Las plantillas iniciales que el módulo ya no ofrece (p. ej.
+    las de la especialidad «básica») se desactivan —no se borran: las consultas viejas conservan su estructura— y la
+    predeterminada pasa a la del módulo. Idempotente.
+    """
+    from apps.core.tenancy import usando_tenant
+    from apps.plataforma.models import Tenant
+    modulos = {c: e for c, e in registro.especialidades().items() if not e.basica and e.plantillas}
+    if not modulos:
+        return
+    for tenant in Tenant.objects.filter(especialidades__codigo__in=modulos.keys()).distinct():
+        with usando_tenant(tenant):
+            for especialidad in tenant.especialidades.filter(codigo__in=modulos.keys()):
+                definicion = modulos[especialidad.codigo]
+                vigentes = {f'{especialidad.codigo}:{p.nombre}' for p in definicion.plantillas}
+                viejas = (PlantillaHistoria.objects.filter(especialidad=especialidad, profesional__isnull=True,
+                                                           activa=True, origen__startswith=f'{especialidad.codigo}:')
+                          .exclude(origen__in=vigentes))
+                if not viejas.exists() and PlantillaHistoria.objects.filter(
+                        especialidad=especialidad, origen__in=vigentes).count() == len(vigentes):
+                    continue
+                cambia_predeterminada = viejas.filter(es_predeterminada=True).exists()
+                viejas.update(activa=False, es_predeterminada=False)
+                asegurar_plantillas_especialidad(especialidad)
+                if cambia_predeterminada:
+                    nueva = next((p for p in definicion.plantillas if p.predeterminada), definicion.plantillas[0])
+                    PlantillaHistoria.objects.filter(especialidad=especialidad, profesional__isnull=True,
+                                                     origen=f'{especialidad.codigo}:{nueva.nombre}') \
+                        .update(es_predeterminada=True)
+                log.info('%s: plantillas de %s actualizadas.', tenant.nombre, especialidad.nombre)
+
+
 def _definiciones_plantillas(especialidad):
     definicion = registro.especialidad(especialidad.codigo)
     return (definicion.plantillas if definicion and definicion.plantillas else registro.plantillas_nucleo())

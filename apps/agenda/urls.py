@@ -7,6 +7,7 @@ app_name = 'agenda'
 urlpatterns = [
     path('', views.dia, name='dia'),
     path('semana/', views.semana, name='semana'),
+    path('horas/', views.horas, name='horas'),
     path('citas/nueva/', views.cita_form, name='cita_nueva'),
     path('citas/<int:pk>/', views.cita, name='cita'),
     path('citas/<int:pk>/editar/', views.cita_form, name='cita_editar'),

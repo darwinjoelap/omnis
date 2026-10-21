@@ -23,6 +23,9 @@
     <div class="col-6 col-md-3">{% include 'partials/campo.html' with campo=form.fecha %}</div>
     <div class="col-6 col-md-3">{% include 'partials/campo.html' with campo=form.hora_inicio %}</div>
     <div class="col-md-6">{% include 'partials/campo.html' with campo=form.lugar %}</div>
+    <div class="col-12"><div id="panel-horas" class="border rounded-3 p-2 bg-light-subtle"
+         hx-get="{% url 'agenda:horas' %}" hx-trigger="load, change from:#id_fecha, change from:#id_profesional"
+         hx-include="#id_fecha, #id_profesional" hx-vals='{"excluir": "{{ cita.pk|default:'' }}"}'><span class="small text-muted">Cargando horas…</span></div></div>
     <div class="col-12">{% include 'partials/campo.html' with campo=form.motivo %}</div>
     <div class="col-12">{% include 'partials/campo.html' with campo=form.notas %}</div>
     <div class="col-12">{% include 'partials/campo.html' with campo=form.sobrecupo %}</div>
@@ -41,6 +44,16 @@
     document.getElementById('paciente-nombre').textContent = b.dataset.nombre;
     document.getElementById('paciente-elegido').classList.remove('d-none');
     document.getElementById('buscar-paciente').classList.add('d-none');
+  });
+  // Panel de horas: tocar una hora libre la asigna (y el lugar de ese horario, si lo tiene)
+  document.getElementById('panel-horas').addEventListener('click', function (e) {
+    const b = e.target.closest('[data-hora]');
+    if (!b) return;
+    document.getElementById('id_hora_inicio').value = b.dataset.hora;
+    const lugar = document.getElementById('id_lugar');
+    if (b.dataset.lugar && lugar && !lugar.value) lugar.value = b.dataset.lugar;
+    document.querySelectorAll('#panel-horas .om-hora-libre.activa').forEach(function (x) { x.classList.remove('activa'); });
+    b.classList.add('activa');
   });
   const cambiar = document.getElementById('cambiar-paciente');
   if (cambiar) cambiar.addEventListener('click', function () {

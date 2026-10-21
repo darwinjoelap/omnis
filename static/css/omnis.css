@@ -493,3 +493,13 @@ textarea.form-control { min-height: auto; }
 .om-barra-pista { border-radius: 4px; }
 .om-barra { border-radius: 4px; background: var(--om-salvia-500); }
 .om-fila-barra:hover .om-barra { background: var(--om-petroleo-700); }
+
+/* Panel de horas al agendar */
+.om-hora { display: inline-block; min-width: 76px; padding: .3rem .5rem; border-radius: 10px; font-size: .8rem;
+  text-align: center; line-height: 1.15; border: 1px solid var(--om-borde, #E6E1D6); background: #fff; }
+.om-hora small { font-size: .68rem; max-width: 76px; }
+.om-hora-libre { color: var(--om-petroleo-700, #2F625B); cursor: pointer; }
+.om-hora-libre:hover, .om-hora-libre.activa { background: var(--om-salvia-100, #E4EFE8); border-color: var(--om-salvia-500, #5D9680); }
+.om-hora-ocupada { background: var(--om-arena-100, #F1EADF); color: #5E4A33; }
+.om-hora-pasada { color: #9AA5A2; background: #F5F3EE; text-decoration: line-through; }
+

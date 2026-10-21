@@ -8,7 +8,7 @@
   {% elif c.tipo == 'calculado' %}
     <div class="col-6 col-md-{{ it.ancho }}" data-campo="{{ c.clave }}">
       <label class="form-label">{{ c.etiqueta }}</label>
-      <input class="form-control om-calculado" value="{% if form.datos_limpios %}{{ form.datos_limpios|obtener:c.clave|default_if_none:'' }}{% endif %}" placeholder="Se calcula al guardar" disabled>
+      <input class="form-control om-calculado" value="{{ form.calculados|obtener:c.clave|default_if_none:'' }}" placeholder="Se calcula al guardar" disabled>
     </div>
   {% elif c.tipo == 'tabla' %}
     <div class="col-12" data-campo="{{ c.clave }}">

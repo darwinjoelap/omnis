@@ -382,5 +382,21 @@ registro.registrar_al_guardar('nucleo.prescripcion', sincronizar_prescripcion)
 registro.registrar_al_guardar('nucleo.motivo', sincronizar_motivo)
 
 
+def programar_proximo_control(consulta, datos):
+    """«Próximo control» del plan → cita tentativa sin hora en la agenda (de Pediae)."""
+    from datetime import date
+
+    from apps.agenda.servicios import programar_control
+    texto = (datos or {}).get('proximo_control') or ''
+    try:
+        fecha = date.fromisoformat(str(texto)[:10]) if texto else None
+    except ValueError:
+        fecha = None
+    programar_control(consulta, fecha)
+
+
+registro.registrar_al_guardar('nucleo.plan', programar_proximo_control)
+
+
 def seccion(seccion_id):
     return SeccionClinica.objects.visibles().get(pk=seccion_id)
