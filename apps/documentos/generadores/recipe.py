@@ -13,7 +13,7 @@ from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
 from reportlab.platypus import BaseDocTemplate, Frame, HRFlowable, PageTemplate, Spacer, Table, TableStyle
 
-from apps.core.pdf import ESTILOS, Paragraph
+from apps.core.pdf import ESTILOS, Paragraph, banner_de, dibujar_firma, dibujar_marca_agua, logo_de, marca_agua_de
 
 from .base import GRIS, LINEA, color_tenant
 
@@ -57,7 +57,7 @@ def _texto(texto):
     return salida
 
 
-def _cabecera(doc, membrete):
+def _cabecera(doc, membrete, logo=None):
     tenant, profesional, paciente = doc.tenant, doc.profesional, doc.paciente
     config = tenant.configuracion
     salida = []
@@ -68,14 +68,29 @@ def _cabecera(doc, membrete):
         escala = min(COLUMNA / ancho, 24 * mm / alto)
         salida.append(Image(BytesIO(membrete), width=ancho * escala, height=alto * escala))
     else:
-        salida.append(Paragraph(profesional.nombre_con_titulo if profesional else config.nombre_display,
-                                ParagraphStyle('n', parent=NOMBRE, textColor=color_tenant(tenant))))
+        # Estilo Pediae: logo + nombre grande + especialidad, credenciales y registros
+        info = [Paragraph(profesional.nombre_con_titulo if profesional else config.nombre_display,
+                          ParagraphStyle('n', parent=NOMBRE, textColor=color_tenant(tenant)))]
+        telefono = (profesional.telefono_consulta if profesional else '') or config.telefono
         for linea in [profesional.especialidad_texto if profesional else '',
+                      profesional.credenciales if profesional else '',
                       profesional.registros_texto if profesional else '',
                       config.nombre_display if profesional else '',
-                      ' · '.join(x for x in [config.telefono, config.email] if x)]:
+                      ' · '.join(x for x in [telefono, config.email] if x)]:
             if linea:
-                salida.append(Paragraph(linea, DATO))
+                info.append(Paragraph(linea, DATO))
+        if logo:
+            from reportlab.platypus import Image
+            lado = 18 * mm
+            ancho, alto = ImageReader(BytesIO(logo)).getSize()
+            escala = min(lado / ancho, lado / alto)
+            t = Table([[Image(BytesIO(logo), width=ancho * escala, height=alto * escala), info]],
+                      colWidths=[lado + 3 * mm, COLUMNA - lado - 3 * mm])
+            t.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'MIDDLE'), ('LEFTPADDING', (0, 0), (-1, -1), 0),
+                                   ('RIGHTPADDING', (0, 0), (-1, -1), 0)]))
+            salida.append(t)
+        else:
+            salida += info
     lugar = doc.consulta.lugar if doc.consulta_id and doc.consulta.lugar_id else None
     if lugar and (lugar.direccion or lugar.nombre):
         salida.append(Paragraph(lugar.direccion or lugar.nombre, DATO))
@@ -110,15 +125,14 @@ def contenido(consulta):
 def generar(doc, con_firma=True):
     profesional = doc.profesional
     datos = contenido(doc.consulta)
-    membrete = None
-    if profesional and profesional.usar_membrete_propio:
-        membrete = _bytes(profesional.membrete)
-    membrete = membrete or _bytes(doc.tenant.configuracion.membrete)
+    membrete = _bytes(banner_de(doc.tenant, profesional))
+    logo = _bytes(logo_de(doc.tenant, profesional))
+    marca = marca_agua_de(doc.tenant, profesional)
     firma = _bytes(profesional.firma) if con_firma and profesional else None
     sello = _bytes(profesional.sello) if con_firma and profesional else None
 
-    izquierda = _cabecera(doc, membrete) + [Paragraph('Rp.', ETIQUETA), Spacer(1, 2 * mm)]
-    derecha = _cabecera(doc, membrete) + [Paragraph('Indicaciones', ETIQUETA), Spacer(1, 2 * mm)]
+    izquierda = _cabecera(doc, membrete, logo) + [Paragraph('Rp.', ETIQUETA), Spacer(1, 2 * mm)]
+    derecha = _cabecera(doc, membrete, logo) + [Paragraph('Indicaciones', ETIQUETA), Spacer(1, 2 * mm)]
     for n, m in enumerate(datos['medicamentos'], 1):
         cantidad = f" — {m['cantidad']}" if m.get('cantidad') else ''
         izquierda.append(Paragraph(f"{n}. {m['medicamento']}{cantidad}", TEXTO))
@@ -148,30 +162,10 @@ def generar(doc, con_firma=True):
     def pie(canvas, documento):
         canvas.saveState()
         centros = (MARGEN + COLUMNA / 2, MARGEN + COLUMNA + SEPARACION + COLUMNA / 2)
-        lineas = []
-        if profesional:
-            lineas = [(profesional.registros_texto, 'Helvetica', 7.5), (profesional.especialidad_texto, 'Helvetica', 7.5),
-                      (profesional.nombre_con_titulo, 'Helvetica-Bold', 8.5)]
-        y = MARGEN
-        for texto, fuente, tamano in lineas:
-            if not texto:
-                continue
-            canvas.setFont(fuente, tamano)
-            canvas.setFillColor(GRIS if fuente == 'Helvetica' else colors.black)
-            for cx in centros:
-                canvas.drawCentredString(cx, y, texto)
-            y += 10
-        y += 2
-        canvas.setStrokeColor(colors.HexColor('#9CA3AF'))
-        canvas.setLineWidth(0.6)
-        for cx in centros:
-            canvas.line(cx - 27 * mm, y, cx + 27 * mm, y)
-            if firma:
-                canvas.drawImage(ImageReader(BytesIO(firma)), cx - 22 * mm, y + 1, width=44 * mm, height=16 * mm,
-                                 mask='auto', preserveAspectRatio=True)
-            if sello:
-                canvas.drawImage(ImageReader(BytesIO(sello)), cx + 24 * mm, MARGEN - 2, width=20 * mm, height=20 * mm,
-                                 mask='auto', preserveAspectRatio=True)
+        for cx in centros:      # logo tenue de fondo en cada mitad (como Pediae)
+            dibujar_marca_agua(canvas, marca, cx, MARGEN + ALTO_FIRMA + (ALTO_PAG - 2 * MARGEN - ALTO_FIRMA) * 0.4,
+                               62 * mm)
+            dibujar_firma(canvas, profesional, cx, MARGEN, firma=firma, sello=sello, ancho_linea=54 * mm)
         corte = MARGEN + COLUMNA + SEPARACION / 2
         canvas.setStrokeColor(LINEA)
         canvas.setDash(2, 3)

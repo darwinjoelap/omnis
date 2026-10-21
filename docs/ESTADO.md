@@ -4,8 +4,8 @@
 > Menos de 100 líneas: el detalle de fases cerradas va a `HISTORIAL.md`; las decisiones, a `DECISIONES.md`.
 
 **Última actualización:** 2026-10-20
-**Fase actual:** 10 cerrada en código → siguiente **11 Reportes** (o 12 PWA offline, ruta crítica)
-**Repositorio:** pendiente de crear (`darwinjoelap/omnis`, privado) — código en `C:\proyectos\omnis`
+**Fase actual:** 11 cerrada en código → siguiente **12 PWA offline** (ruta crítica) o 13/14 módulo de especialidad
+**Repositorio:** `github.com/darwinjoelap/omnis` (privado), rama `main` — código en `C:\proyectos\omnis`
 **Staging / producción:** pendientes (Railway no creado)
 
 ---
@@ -21,17 +21,19 @@
 - [x] 08 Agenda multi-profesional (horarios, bloqueos, tipos, sobrecupo, WhatsApp, «Atender»)
 - [x] 09 Cobros: cargos, pagos USD/Bs, abonos, saldo a favor, caja del día, por cobrar
 - [x] 10 Documentos PDF: récipe (2 columnas), informe, referencia, reposo, constancia, recibo
+- [x] 11 Reportes: tablero con filtros, morbilidad CIE-10, agenda, ingresos, por profesional; PDF y Excel (ADR-031)
+- [x] Perfil del médico estilo Pediae: logo/marca de agua, banner, firma y sello fijos al pie (ADR-030)
 - [x] Alcance de pacientes por rol (ADR-029): médico ve los suyos; asistente/titular ven todo; configurable
 - [x] Marca **Omnis** (ADR-028): logo, paleta, fuentes locales, login en dos paneles, inicio con cifras del día
 
-**Verificación:** 100 tests en verde en SQLite y PostgreSQL 16 · `ruff` limpio · `makemigrations --check` limpio ·
+**Verificación:** 107 tests en verde en SQLite y PostgreSQL 16 · `ruff` limpio · `makemigrations --check` limpio ·
 prueba E2E con navegador (escritorio y móvil) de paciente → consulta → cierre → PDF.
 
 ## Pendiente inmediato
 1. Darwin: Python 3.14.3 confirmado — crear venv con Python 3.14 (`py -3.14 --version`), `pip install -r requirements-dev.txt`, `migrate`, `test`.
 2. Darwin: prueba manual con `crear_tenant` (ver README) — revisar textos de reposo/constancia y el récipe impreso.
-3. Crear repo GitHub + proyecto Railway (Postgres, servicio web, servicio cron) → staging.
-4. Fase 11 Reportes · Fase 12 PWA offline · Fase 13/14 módulo Pediatría o Ginecología.
+3. Crear proyecto Railway (Postgres, servicio web, servicio cron) → staging.
+4. Fase 12 PWA offline · Fase 13/14 módulo Pediatría o Ginecología.
 
 ## Incompleto / provisional (decir siempre)
 - ADR 002–007 y 009–019 aplicadas como provisionales (ADR-020): revisar.

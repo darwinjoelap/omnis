@@ -59,19 +59,101 @@ def _color(config):
     return colors.HexColor(getattr(config, 'color_primario', '') or '#2F625B')
 
 
+def archivo_bytes(archivo):
+    """Bytes de un ImageField (local o Cloudinary) o None. Nunca lanza: una imagen dañada no impide el PDF."""
+    if not archivo:
+        return None
+    try:
+        archivo.open('rb')
+        datos = archivo.read()
+        archivo.close()
+        ImageReader(BytesIO(datos)).getSize()
+        return datos
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def png_tenue(datos, opacidad=0.08, max_px=600):
+    """Versión transparente de una imagen para la marca de agua (como Pediae)."""
+    if not datos:
+        return None
+    try:
+        from PIL import Image as PILImage
+        img = PILImage.open(BytesIO(datos)).convert('RGBA')
+        img.thumbnail((max_px, max_px))
+        alfa = img.getchannel('A').point(lambda v: int(v * opacidad))
+        img.putalpha(alfa)
+        salida = BytesIO()
+        img.save(salida, 'PNG')
+        return salida.getvalue()
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def logo_de(tenant, profesional=None):
+    """Logo para encabezado y marca de agua: el del profesional; si no tiene, el del consultorio."""
+    if profesional is not None and profesional.logo:
+        return profesional.logo
+    config = tenant.configuracion
+    return config.logo_pdf or config.logo or None
+
+
+def banner_de(tenant, profesional=None):
+    if profesional is not None and profesional.usar_membrete_propio and profesional.membrete:
+        return profesional.membrete
+    return tenant.configuracion.membrete or None
+
+
+def marca_agua_de(tenant, profesional=None):
+    """Bytes PNG tenues para el fondo, o None si el profesional la desactivó o no hay logo."""
+    if profesional is not None and not profesional.marca_agua:
+        return None
+    return png_tenue(archivo_bytes(logo_de(tenant, profesional)))
+
+
+def dibujar_marca_agua(canvas, datos, cx, cy, lado):
+    if datos:
+        canvas.drawImage(ImageReader(BytesIO(datos)), cx - lado / 2, cy - lado / 2, width=lado, height=lado,
+                         mask='auto', preserveAspectRatio=True)
+
+
+def dibujar_firma(canvas, profesional, cx, y, firma=None, sello=None, ancho_linea=60 * mm):
+    """
+    Bloque de firma dibujado en el canvas (fijo al pie, como Pediae): de abajo hacia arriba, registros,
+    especialidad, nombre, la raya y sobre ella la firma; el sello a la derecha de la raya.
+    """
+    if profesional is None:
+        return
+    lineas = [(profesional.registros_texto, 'Helvetica', 7.5), (profesional.especialidad_texto, 'Helvetica', 7.5),
+              (profesional.nombre_con_titulo, 'Helvetica-Bold', 9)]
+    for texto, fuente, tamano in lineas:
+        if not texto:
+            continue
+        canvas.setFont(fuente, tamano)
+        canvas.setFillColor(colors.HexColor('#55625F') if fuente == 'Helvetica' else colors.HexColor('#1D2B2A'))
+        canvas.drawCentredString(cx, y, texto)
+        y += tamano + 3
+    y += 2
+    canvas.setStrokeColor(colors.HexColor('#7C8A86'))
+    canvas.setLineWidth(0.6)
+    canvas.line(cx - ancho_linea / 2, y, cx + ancho_linea / 2, y)
+    if firma:
+        canvas.drawImage(ImageReader(BytesIO(firma)), cx - 24 * mm, y + 1, width=48 * mm, height=17 * mm,
+                         mask='auto', preserveAspectRatio=True)
+    if sello:
+        canvas.drawImage(ImageReader(BytesIO(sello)), cx + ancho_linea / 2 + 2 * mm, y - 12 * mm, width=24 * mm,
+                         height=24 * mm, mask='auto', preserveAspectRatio=True)
+
+
 def encabezado_tenant(tenant, titulo='', subtitulo='', profesional=None):
     """
-    Flowables del encabezado. Si el profesional usa membrete propio, o el consultorio cargó un membrete
-    (imagen de banner), se usa esa imagen; si no, logo + datos del consultorio (+ datos del profesional).
+    Flowables del encabezado (estilo Pediae). Con banner (del profesional si lo activó, si no del consultorio)
+    se usa la imagen. Si no: logo + nombre grande del profesional + especialidad + credenciales + registros,
+    y debajo consultorio, dirección y teléfono. A la derecha, el título del documento.
     """
     config = tenant.configuracion
     color = _color(config)
-    membrete = None
-    if profesional is not None and profesional.usar_membrete_propio and profesional.membrete:
-        membrete = profesional.membrete
-    elif config.membrete:
-        membrete = config.membrete
-    banner = imagen_ajustada(membrete, 186 * mm, 32 * mm) if membrete else None
+    banner = imagen_ajustada(banner_de(tenant, profesional), 186 * mm, 32 * mm)
 
     derecha = []
     if titulo:
@@ -86,22 +168,27 @@ def encabezado_tenant(tenant, titulo='', subtitulo='', profesional=None):
             elementos.append(Table([[derecha]], colWidths=[186 * mm]))
         return elementos + [HRFlowable(width='100%', thickness=1.2, color=color), Spacer(1, 4 * mm)]
 
-    estilo_nombre = ParagraphStyle('n', parent=ESTILO_NOMBRE, textColor=color)
-    datos = [Paragraph(config.nombre_display, estilo_nombre)]
+    estilo_nombre = ParagraphStyle('n', parent=ESTILO_NOMBRE, fontSize=16, leading=19, textColor=color)
+    datos = []
     if profesional is not None:
-        datos.append(Paragraph(f'<b>{profesional.nombre_con_titulo}</b>', ESTILO_DATO))
-        linea = ' · '.join(x for x in [profesional.especialidad_texto, profesional.registros_texto] if x)
-        if linea:
-            datos.append(Paragraph(linea, ESTILO_DATO))
+        datos.append(Paragraph(profesional.nombre_con_titulo, estilo_nombre))
+        for linea in (profesional.especialidad_texto, profesional.credenciales, profesional.registros_texto):
+            if linea:
+                datos.append(Paragraph(linea, ESTILO_DATO))
+        datos.append(Spacer(1, 1.5 * mm))
+        datos.append(Paragraph(f'<b>{config.nombre_display}</b>', ESTILO_DATO))
+    else:
+        datos.append(Paragraph(config.nombre_display, estilo_nombre))
     if config.rif:
         datos.append(Paragraph(f'RIF: {config.rif}', ESTILO_DATO))
     if config.direccion:
         datos.append(Paragraph(config.direccion.replace('\n', '<br/>'), ESTILO_DATO))
-    contacto = ' · '.join(x for x in [config.telefono, config.email] if x)
+    telefono = (profesional.telefono_consulta if profesional is not None else '') or config.telefono
+    contacto = ' · '.join(x for x in [telefono, config.email] if x)
     if contacto:
         datos.append(Paragraph(contacto, ESTILO_DATO))
 
-    logo = imagen_ajustada(config.logo_pdf or config.logo, 46 * mm, 22 * mm)
+    logo = imagen_ajustada(logo_de(tenant, profesional), 24 * mm, 24 * mm)
     celdas = [logo, datos, derecha] if logo else [datos, derecha]
     if logo:
         ancho_logo = logo.drawWidth + 5 * mm
@@ -110,7 +197,8 @@ def encabezado_tenant(tenant, titulo='', subtitulo='', profesional=None):
         anchos = [120 * mm, 66 * mm]
     tabla = Table([celdas], colWidths=anchos)
     tabla.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('VALIGN', (-1, 0), (-1, 0), 'TOP'),
         ('LEFTPADDING', (0, 0), (-1, -1), 0),
         ('RIGHTPADDING', (0, 0), (-1, -1), 4),
     ]))

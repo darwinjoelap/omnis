@@ -39,16 +39,19 @@ class AgregarForm(FormBase, forms.Form):
 class PerfilProfesionalForm(FormBase, forms.ModelForm):
     quitar_firma = forms.BooleanField(label='Quitar firma', required=False)
     quitar_sello = forms.BooleanField(label='Quitar sello', required=False)
-    quitar_membrete = forms.BooleanField(label='Quitar membrete', required=False)
+    quitar_membrete = forms.BooleanField(label='Quitar banner', required=False)
+    quitar_logo = forms.BooleanField(label='Quitar logo', required=False)
 
     class Meta:
         model = PerfilProfesional
         fields = ['especialidad', 'subespecialidad', 'titulo', 'credenciales', 'numero_mpps', 'numero_colegio',
-                  'telefono_consulta', 'firma', 'sello', 'membrete', 'usar_membrete_propio', 'color_agenda']
+                  'telefono_consulta', 'firma', 'sello', 'membrete', 'usar_membrete_propio', 'logo', 'marca_agua',
+                  'color_agenda']
         widgets = {
             'firma': forms.FileInput(attrs={'accept': 'image/png,image/jpeg'}),
             'sello': forms.FileInput(attrs={'accept': 'image/png,image/jpeg'}),
             'membrete': forms.FileInput(attrs={'accept': 'image/png,image/jpeg'}),
+            'logo': forms.FileInput(attrs={'accept': 'image/png,image/jpeg'}),
             'color_agenda': forms.TextInput(attrs={'type': 'color', 'class': 'form-control form-control-color'}),
         }
 
@@ -73,11 +76,14 @@ class PerfilProfesionalForm(FormBase, forms.ModelForm):
         return self._imagen('sello', 'El sello')
 
     def clean_membrete(self):
-        return self._imagen('membrete', 'El membrete')
+        return self._imagen('membrete', 'El banner')
+
+    def clean_logo(self):
+        return self._imagen('logo', 'El logo')
 
     def save(self, commit=True):
         perfil = super().save(commit=False)
-        for campo in ('firma', 'sello', 'membrete'):
+        for campo in ('firma', 'sello', 'membrete', 'logo'):
             if self.cleaned_data.get(f'quitar_{campo}') and not self.files.get(campo):
                 archivo = getattr(perfil, campo)
                 if archivo:

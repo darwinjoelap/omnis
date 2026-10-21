@@ -136,3 +136,33 @@ def menu_documentos(request, consulta=None):
     if consulta is not None and consulta.profesional_id != perfil.pk:
         salida = [d for d in salida if not d.requiere_consulta]
     return [d for d in salida if not d.extra.get('interno')]
+
+
+@login_required
+def prueba(request, perfil_pk=None):
+    """PDF de muestra con el perfil del profesional: banner o logo, marca de agua, firma y sello al pie."""
+    from types import SimpleNamespace
+
+    from django.utils import timezone
+
+    from apps.core.pdf import Paragraph
+    from apps.equipo.models import PerfilProfesional
+
+    from .generadores.base import CUERPO, construir, lugar_y_fecha, titulo
+    propio = request.membresia.perfil_activo if request.membresia else None
+    if perfil_pk is not None and (propio is None or propio.pk != perfil_pk):
+        if not tiene_permiso(request, 'usuarios.gestionar'):
+            raise PermissionDenied
+        perfil = get_object_or_404(PerfilProfesional.objects.all(), pk=perfil_pk)
+    else:
+        perfil = propio
+    if perfil is None:
+        raise Http404
+    hoy = timezone.localdate()
+    doc = SimpleNamespace(tenant=request.tenant, profesional=perfil, numero='MUESTRA', fecha=hoy,
+                          datos={}, consulta_id=None, consulta=None)
+    cuerpo = lugar_y_fecha(hoy) + titulo('Documento de muestra', request.tenant)
+    cuerpo.append(Paragraph(
+        'Así se verán sus récipes, informes, reposos y constancias: encabezado con su banner o con su logo y '
+        'datos profesionales, el logo tenue de fondo y su firma y sello fijos al pie de cada hoja.', CUERPO))
+    return respuesta_pdf(construir(doc, cuerpo), 'muestra', perfil.nombre_con_titulo)

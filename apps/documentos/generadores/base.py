@@ -6,19 +6,21 @@ from io import BytesIO
 
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_JUSTIFY, TA_RIGHT
+from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
-from reportlab.platypus import HRFlowable, KeepTogether, Spacer, Table, TableStyle
+from reportlab.platypus import BaseDocTemplate, Frame, HRFlowable, PageTemplate, Spacer, Table, TableStyle
 
 from apps.core.pdf import (
     ESTILO_CELDA,
     ESTILO_DATO,
     ESTILOS,
     Paragraph,
-    bloque_firma,
-    documento,
+    archivo_bytes,
+    dibujar_firma,
+    dibujar_marca_agua,
     encabezado_tenant,
-    pie_tenant,
+    marca_agua_de,
 )
 
 GRIS = colors.HexColor('#6B7280')
@@ -122,15 +124,37 @@ def nota_confidencial():
 
 
 def construir(doc, cuerpo, *, con_firma=True, titulo_pdf=''):
-    """Arma el PDF vertical: encabezado del consultorio/profesional + cuerpo + firma + pie."""
+    """
+    PDF vertical estilo Pediae: encabezado (banner o logo + datos del profesional), cuerpo, logo tenue de fondo
+    y la firma/sello FIJOS al pie de cada hoja (nunca quedan solos en otra página).
+    """
     tenant, profesional = doc.tenant, doc.profesional
+    config = tenant.configuracion
     buffer = BytesIO()
-    plantilla = documento(buffer, titulo_pdf=titulo_pdf or doc.numero)
-    historia = encabezado_tenant(tenant, profesional=profesional)
-    historia += cuerpo
-    historia.append(KeepTogether(bloque_firma(profesional, incluir_firma=con_firma)))
-    pie = pie_tenant(tenant)
-    plantilla.build(historia, onFirstPage=pie, onLaterPages=pie)
+    alto_firma = 42 * mm if profesional is not None else 0
+    ancho_pag, alto_pag = letter
+    margen = 15 * mm
+    marca = marca_agua_de(tenant, profesional)
+    firma = archivo_bytes(profesional.firma) if con_firma and profesional is not None else None
+    sello = archivo_bytes(profesional.sello) if con_firma and profesional is not None else None
+
+    def pagina(canvas, plantilla):
+        canvas.saveState()
+        dibujar_marca_agua(canvas, marca, ancho_pag / 2, alto_pag * 0.45, 110 * mm)
+        dibujar_firma(canvas, profesional, ancho_pag / 2, 24 * mm, firma=firma, sello=sello)
+        canvas.setFont('Helvetica', 7.5)
+        canvas.setFillColor(colors.HexColor('#55625F'))
+        if config.pie_documentos:
+            canvas.drawString(margen, 11 * mm, config.pie_documentos[:150])
+        canvas.drawRightString(ancho_pag - margen, 11 * mm,
+                               f'{doc.numero} · Página {plantilla.page} · Omnis')
+        canvas.restoreState()
+
+    marco = Frame(margen, 16 * mm + alto_firma, ancho_pag - 2 * margen, alto_pag - 14 * mm - 16 * mm - alto_firma,
+                  leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)
+    plantilla = BaseDocTemplate(buffer, pagesize=letter, title=titulo_pdf or doc.numero,
+                                pageTemplates=[PageTemplate(id='doc', frames=[marco], onPage=pagina)])
+    plantilla.build(encabezado_tenant(tenant, profesional=profesional) + cuerpo)
     return buffer.getvalue()
 
 

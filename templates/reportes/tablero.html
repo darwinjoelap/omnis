@@ -1,0 +1,120 @@
+{% extends 'base.html' %}
+{% load l10n %}
+{% block contenido %}
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+  <div>
+    <div class="om-eyebrow">Reportes</div>
+    <h1 class="h3 mb-0">{% if filtros.todo_el_consultorio %}Gestión del consultorio{% else %}Mi gestión{% endif %}</h1>
+    <div class="text-muted">{{ filtros.periodo_texto }}{% if filtros.profesional and filtros.todo_el_consultorio %} · {{ filtros.profesional }}{% endif %}{% if filtros.especialidad %} · {{ filtros.especialidad.nombre }}{% endif %}</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'reportes:pdf' %}?{{ query }}" target="_blank" data-pdf class="btn btn-outline-secondary btn-sm"><i class="bi bi-file-earmark-pdf me-1"></i>PDF</a>
+    <a href="{% url 'reportes:excel' %}?{{ query }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Excel</a>
+  </div>
+</div>
+
+<form method="get" class="card card-body mb-3">
+  <div class="row g-2 align-items-end">
+    <div class="col-6 col-md-2"><label class="form-label" for="r-desde">Desde</label><input id="r-desde" type="date" name="desde" value="{{ filtros.desde|date:'Y-m-d' }}" class="form-control"></div>
+    <div class="col-6 col-md-2"><label class="form-label" for="r-hasta">Hasta</label><input id="r-hasta" type="date" name="hasta" value="{{ filtros.hasta|date:'Y-m-d' }}" class="form-control"></div>
+    {% if gestion %}
+    <div class="col-md-3"><label class="form-label" for="r-prof">Profesional</label>
+      <select id="r-prof" name="profesional" class="form-select"><option value="">Todos</option>
+        {% for p in profesionales %}<option value="{{ p.pk }}" {% if filtros.profesional.pk == p.pk %}selected{% endif %}>{{ p }}</option>{% endfor %}
+      </select></div>
+    {% if especialidades|length > 1 %}
+    <div class="col-md-3"><label class="form-label" for="r-esp">Especialidad</label>
+      <select id="r-esp" name="especialidad" class="form-select"><option value="">Todas</option>
+        {% for e in especialidades %}<option value="{{ e.pk }}" {% if filtros.especialidad.pk == e.pk %}selected{% endif %}>{{ e.nombre }}</option>{% endfor %}
+      </select></div>
+    {% endif %}
+    {% endif %}
+    <div class="col-md-2"><button class="btn btn-primary w-100"><i class="bi bi-funnel me-1"></i>Filtrar</button></div>
+  </div>
+  <div class="d-flex flex-wrap gap-2 mt-2">
+    {% for nombre, d, h in rangos %}<a class="btn btn-sm {% if d == filtros.desde and h == filtros.hasta %}btn-success{% else %}btn-outline-secondary{% endif %}" href="?desde={{ d|date:'Y-m-d' }}&hasta={{ h|date:'Y-m-d' }}{% if gestion and filtros.profesional %}&profesional={{ filtros.profesional.pk }}{% endif %}">{{ nombre }}</a>{% endfor %}
+  </div>
+</form>
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg"><div class="card h-100"><div class="card-body"><div class="om-cifra-etiqueta">Consultas</div><div class="om-cifra">{{ consultas }}</div><div class="small text-muted">{{ controles }} controles</div></div></div></div>
+  <div class="col-6 col-lg"><div class="card h-100"><div class="card-body"><div class="om-cifra-etiqueta">Pacientes atendidos</div><div class="om-cifra">{{ pacientes_atendidos }}</div><div class="small text-success fw-semibold">{{ pacientes_nuevos }} nuevo{{ pacientes_nuevos|pluralize }}</div></div></div></div>
+  <div class="col-6 col-lg"><div class="card h-100"><div class="card-body"><div class="om-cifra-etiqueta">Citas atendidas</div><div class="om-cifra">{{ agenda.atendidas }}</div><div class="small text-muted">de {{ agenda.total }} agendadas</div></div></div></div>
+  <div class="col-6 col-lg"><div class="card h-100"><div class="card-body"><div class="om-cifra-etiqueta">Asistencia</div><div class="om-cifra">{% if agenda.tasa_asistencia is not None %}{{ agenda.tasa_asistencia }}%{% else %}—{% endif %}</div><div class="small text-muted">{{ agenda.no_asistio }} no asistió</div></div></div></div>
+  {% if ve_finanzas %}
+  <div class="col-6 col-lg"><div class="card h-100"><div class="card-body"><div class="om-cifra-etiqueta">Cobrado</div><div class="om-cifra">{{ finanzas.cobrado|usd }}</div><div class="small text-muted">por cobrar {{ finanzas.por_cobrar|usd }}</div></div></div></div>
+  {% endif %}
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card h-100"><div class="card-header">Por mes</div><div class="card-body">
+      {% if mensual %}
+      <div class="om-columnas" role="img" aria-label="Consultas por mes">
+        {% for m in mensual %}
+        <div class="om-columna">
+          <div class="om-columna-valor">{{ m.consultas }}</div>
+          <div class="om-columna-pista"><div class="om-columna-barra" style="height: {{ m.pct_consultas|unlocalize }}%"></div></div>
+          <div class="om-columna-etiqueta">{{ m.mes }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="table-responsive mt-3"><table class="table table-sm mb-0 small">
+        <thead class="table-light"><tr><th>Mes</th><th class="text-end">Consultas</th><th class="text-end">Citas atendidas</th>{% if ve_finanzas %}<th class="text-end">Cobrado</th>{% endif %}</tr></thead>
+        <tbody>{% for m in mensual %}<tr><td>{{ m.mes }}</td><td class="text-end">{{ m.consultas }}</td><td class="text-end">{{ m.citas_atendidas }}</td>{% if ve_finanzas %}<td class="text-end">{{ m.cobrado|usd }}</td>{% endif %}</tr>{% endfor %}</tbody>
+      </table></div>
+      {% endif %}
+    </div></div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card h-100"><div class="card-header">Agenda</div><div class="card-body">
+      {% include 'reportes/_barras.html' with barras=agenda.estados vacio='Sin citas en el período.' %}
+      <div class="small text-muted mt-2">{{ agenda.sin_cita }} consulta{{ agenda.sin_cita|pluralize }} sin cita previa.</div>
+    </div></div>
+  </div>
+
+  <div class="col-lg-8">
+    <div class="card h-100"><div class="card-header">Diagnósticos más frecuentes (CIE-10)</div><div class="card-body">
+      {% include 'reportes/_barras.html' with barras=morbilidad vacio='Sin diagnósticos registrados en el período.' %}
+    </div></div>
+  </div>
+  <div class="col-lg-4 d-flex flex-column gap-3">
+    <div class="card"><div class="card-header">Tipo de consulta</div><div class="card-body">{% include 'reportes/_barras.html' with barras=tipos vacio='Sin consultas.' %}</div></div>
+    <div class="card"><div class="card-header">Pacientes por sexo</div><div class="card-body">{% include 'reportes/_barras.html' with barras=sexos vacio='Sin pacientes.' %}</div></div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card h-100"><div class="card-header">Pacientes atendidos por edad</div><div class="card-body">{% include 'reportes/_barras.html' with barras=edades vacio='Sin pacientes.' %}</div></div>
+  </div>
+  {% if ve_finanzas %}
+  <div class="col-lg-6">
+    <div class="card h-100"><div class="card-header">Ingresos (USD)</div><div class="card-body">
+      <div class="row g-2 mb-3 small">
+        <div class="col-6 col-md-3"><div class="text-muted">Facturado</div><div class="fw-semibold">{{ finanzas.facturado|usd }}</div></div>
+        <div class="col-6 col-md-3"><div class="text-muted">Cobrado</div><div class="fw-semibold">{{ finanzas.cobrado|usd }}</div></div>
+        <div class="col-6 col-md-3"><div class="text-muted">Costo</div><div class="fw-semibold">{{ finanzas.costo|usd }}</div></div>
+        <div class="col-6 col-md-3"><div class="text-muted">Ingreso real</div><div class="fw-semibold">{{ finanzas.ingreso_real|usd }}</div></div>
+      </div>
+      {% include 'reportes/_barras.html' with barras=finanzas.por_metodo dinero=True vacio='Sin cobros en el período.' %}
+    </div></div>
+  </div>
+  {% endif %}
+
+  {% if por_profesional %}
+  <div class="col-12">
+    <div class="card"><div class="card-header">Por profesional</div>
+      <div class="table-responsive"><table class="table align-middle mb-0 om-tabla">
+        <thead class="table-light"><tr><th>Profesional</th><th class="text-end">Consultas</th><th class="text-end">Pacientes</th><th class="text-end">Citas atendidas</th><th class="text-end">Cobrado</th></tr></thead>
+        <tbody>{% for x in por_profesional %}
+          <tr onclick="location.href='?desde={{ filtros.desde|date:'Y-m-d' }}&hasta={{ filtros.hasta|date:'Y-m-d' }}&profesional={{ x.profesional.pk }}'" role="button">
+            <td data-label="Profesional"><span class="om-color-punto me-1" style="background: {{ x.profesional.color_agenda }}"></span>{{ x.profesional }}<div class="small text-muted">{{ x.profesional.especialidad_texto }}</div></td>
+            <td data-label="Consultas" class="text-end">{{ x.consultas }}</td><td data-label="Pacientes" class="text-end">{{ x.pacientes }}</td>
+            <td data-label="Citas atendidas" class="text-end">{{ x.citas_atendidas }}</td><td data-label="Cobrado" class="text-end">{{ x.cobrado|usd }}</td>
+          </tr>{% endfor %}</tbody>
+      </table></div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+<p class="small text-muted mt-3 mb-0">Cobrado = pagos aplicados a cargos del período. Las consultas anuladas no se cuentan. Paciente nuevo = su primera consulta cae en el período.</p>
+{% endblock %}

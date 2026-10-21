@@ -16,6 +16,11 @@
 
 ---
 
+### Fase 11 + perfil Pediae (2026-10-20)
+- Hecho: app `reportes` (tablero, PDF, Excel), perfil profesional con logo/marca de agua/banner, firma y sello fijos al pie de los PDF, documento de muestra por médico.
+- Verificado: 107 tests (SQLite + PostgreSQL), ruff limpio, capturas escritorio/móvil y PDF revisados.
+- ADR: 030, 031.
+
 ### Fases 01–10 — Base, clínica, agenda, cobros y documentos (2026-10-20)
 - Hecho: esqueleto y despliegue preparado (sin crear Railway); tenancy fail-closed con `TenantModel`;
   login por enlace del consultorio; roles + pseudo-rol PROFESIONAL; plataforma (planes, suscripciones,

@@ -3,7 +3,7 @@
 {% if 'usuarios.gestionar' in permisos %}<a href="{% url 'equipo:lista' %}" class="small text-decoration-none"><i class="bi bi-arrow-left"></i> Equipo</a>{% endif %}
 <h1 class="h3 mb-1 mt-1">Perfil profesional</h1>
 <p class="text-muted">{{ miembro.usuario.get_full_name|default:miembro.usuario.username }} · así aparece en récipes, informes y constancias.</p>
-<form method="post" enctype="multipart/form-data" class="row g-3" style="max-width:1000px">{% csrf_token %}
+<form method="post" enctype="multipart/form-data" class="row g-3" style="max-width:1100px">{% csrf_token %}
   {% for e in form.non_field_errors %}<div class="col-12"><div class="alert alert-danger py-2">{{ e }}</div></div>{% endfor %}
   <div class="col-lg-7"><div class="card card-body h-100">
     <h2 class="h6">Datos</h2>
@@ -18,25 +18,39 @@
       <div class="col-md-6">{% include 'partials/campo.html' with campo=form.color_agenda %}</div>
     </div>
   </div></div>
-  <div class="col-lg-5"><div class="card card-body h-100">
-    <h2 class="h6">Firma, sello y membrete</h2>
-    <div class="mb-3">
-      {% include 'partials/campo.html' with campo=form.firma %}
-      {% if perfil.firma %}<div class="d-flex align-items-center gap-2 mt-1"><img src="{{ perfil.firma.url }}" alt="Firma" class="om-logo-actual">{% include 'partials/campo.html' with campo=form.quitar_firma %}</div>{% endif %}
+  <div class="col-lg-5 d-flex flex-column gap-3">
+    <div class="card card-body">
+      <h2 class="h6 mb-2">Firma y sello</h2>
+      <div class="mb-3">
+        {% include 'partials/campo.html' with campo=form.firma %}
+        {% if perfil.firma %}<div class="d-flex align-items-center gap-2 mt-1"><img src="{{ perfil.firma.url }}" alt="Firma actual" class="om-logo-actual">{% include 'partials/campo.html' with campo=form.quitar_firma %}</div>{% endif %}
+      </div>
+      <div>
+        {% include 'partials/campo.html' with campo=form.sello %}
+        {% if perfil.sello %}<div class="d-flex align-items-center gap-2 mt-1"><img src="{{ perfil.sello.url }}" alt="Sello actual" class="om-logo-actual">{% include 'partials/campo.html' with campo=form.quitar_sello %}</div>{% endif %}
+      </div>
     </div>
-    <div class="mb-3">
-      {% include 'partials/campo.html' with campo=form.sello %}
-      {% if perfil.sello %}<div class="d-flex align-items-center gap-2 mt-1"><img src="{{ perfil.sello.url }}" alt="Sello" class="om-logo-actual">{% include 'partials/campo.html' with campo=form.quitar_sello %}</div>{% endif %}
+    <div class="card card-body">
+      <h2 class="h6 mb-2">Logo y marca de agua</h2>
+      <div class="mb-2">
+        {% include 'partials/campo.html' with campo=form.logo %}
+        {% if perfil.logo %}<div class="d-flex align-items-center gap-2 mt-1"><img src="{{ perfil.logo.url }}" alt="Logo actual" class="om-logo-actual">{% include 'partials/campo.html' with campo=form.quitar_logo %}</div>{% endif %}
+      </div>
+      {% include 'partials/campo.html' with campo=form.marca_agua %}
     </div>
-    <div class="mb-2">
-      {% include 'partials/campo.html' with campo=form.membrete %}
-      {% if perfil.membrete %}<div class="d-flex align-items-center gap-2 mt-1"><img src="{{ perfil.membrete.url }}" alt="Membrete" class="om-logo-actual">{% include 'partials/campo.html' with campo=form.quitar_membrete %}</div>{% endif %}
+    <div class="card card-body">
+      <h2 class="h6 mb-1">Banner del encabezado</h2>
+      <p class="small text-muted mb-2">Opcional.</p>
+      <div class="mb-2">
+        {% include 'partials/campo.html' with campo=form.membrete %}
+        {% if perfil.membrete %}<div class="mt-1"><img src="{{ perfil.membrete.url }}" alt="Banner actual" class="img-fluid border rounded-3 bg-white p-1"></div><div class="mt-1">{% include 'partials/campo.html' with campo=form.quitar_membrete %}</div>{% endif %}
+      </div>
+      {% include 'partials/campo.html' with campo=form.usar_membrete_propio %}
     </div>
-    {% include 'partials/campo.html' with campo=form.usar_membrete_propio %}
-  </div></div>
+  </div>
   <div class="col-12 d-flex gap-2">
     <button class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Guardar</button>
-    {% if perfil and 'tenant.configurar' in permisos %}<a href="{% url 'configuracion:pdf_prueba' %}" target="_blank" data-pdf class="btn btn-outline-secondary"><i class="bi bi-file-earmark-pdf me-1"></i>Ver PDF de prueba</a>{% endif %}
+    {% if perfil.pk %}<a href="{% url 'documentos:muestra_perfil' perfil.pk %}" target="_blank" data-pdf class="btn btn-outline-secondary"><i class="bi bi-file-earmark-pdf me-1"></i>Ver documento de muestra</a>{% endif %}
   </div>
 </form>
 {% endblock %}

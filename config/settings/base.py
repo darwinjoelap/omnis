@@ -43,6 +43,7 @@ OMNIS_APPS = [
     'apps.agenda',
     'apps.clinica',
     'apps.documentos',
+    'apps.reportes',
     # Especialidades (módulos enchufables): agregar aquí + `sincronizar_especialidades`
     'apps.especialidades.general',
 ]

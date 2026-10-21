@@ -71,9 +71,16 @@ class PerfilProfesional(TenantModel, Auditable):
                               help_text='PNG con fondo transparente; aparece sobre la línea de firma de los PDF.')
     sello = models.ImageField('Sello', upload_to=_ruta_firma, blank=True,
                               help_text='PNG con fondo transparente; aparece junto a la firma.')
-    membrete = models.ImageField('Membrete propio', upload_to=_ruta_firma, blank=True,
-                                 help_text='Banner horizontal para sus récipes e informes.')
-    usar_membrete_propio = models.BooleanField('Usar mi membrete en los PDF', default=False)
+    membrete = models.ImageField('Banner del encabezado', upload_to=_ruta_firma, blank=True,
+                                 help_text='Imagen horizontal de 1200 × 200 px (6:1), PNG o JPG con fondo blanco '
+                                           'o transparente. Reemplaza el encabezado escrito.')
+    usar_membrete_propio = models.BooleanField('Usar mi banner en los PDF', default=False,
+                                               help_text='Reemplaza el encabezado escrito por la imagen del banner.')
+    logo = models.ImageField('Logo propio', upload_to=_ruta_firma, blank=True,
+                             help_text='Aparece junto a su nombre en el encabezado y como marca de agua. '
+                                       'Si no carga uno, se usa el logo del consultorio.')
+    marca_agua = models.BooleanField('Logo de fondo (marca de agua) en los PDF', default=True,
+                                     help_text='Logo tenue en el centro de récipes, informes y constancias.')
     color_agenda = models.CharField('Color en la agenda', max_length=7, default='#5D9680')
     activo = models.BooleanField('Activo', default=True)
 

@@ -17,6 +17,9 @@
       <a href="{% url 'cobros:caja' %}" class="nav-link {% if app == 'cobros' and nombre in 'caja cuenta' %}active{% endif %}"><i class="bi bi-cash-stack"></i> Caja</a>
       <a href="{% url 'cobros:por_cobrar' %}" class="nav-link {% if app == 'cobros' and nombre == 'por_cobrar' %}active{% endif %}"><i class="bi bi-hourglass-split"></i> Por cobrar</a>
     {% endif %}
+    {% if 'reportes.ver' in permisos or 'reportes.propios' in permisos %}
+      <a href="{% url 'reportes:tablero' %}" class="nav-link {% if app == 'reportes' %}active{% endif %}"><i class="bi bi-bar-chart-line"></i> Reportes</a>
+    {% endif %}
     {% if 'plantillas.propias' in permisos or 'plantillas.clinica' in permisos %}
       <div class="nav-seccion">Historia clínica</div>
       <a href="{% url 'clinica:plantillas' %}" class="nav-link {% if app == 'clinica' and 'plantilla' in nombre %}active{% endif %}"><i class="bi bi-ui-checks-grid"></i> Plantillas</a>

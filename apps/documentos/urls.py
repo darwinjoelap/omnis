@@ -10,4 +10,6 @@ urlpatterns = [
     path('<int:pk>/pdf/', views.pdf, name='pdf'),
     path('<int:pk>/anular/', views.anular, name='anular'),
     path('recibos/<int:pago_pk>/', views.recibo, name='recibo'),
+    path('muestra/', views.prueba, name='muestra'),
+    path('muestra/<int:perfil_pk>/', views.prueba, name='muestra_perfil'),
 ]
