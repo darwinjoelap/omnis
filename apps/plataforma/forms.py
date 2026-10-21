@@ -54,6 +54,8 @@ class EditarTenantForm(_TenantBase):
                                          help_text='Vacío = el del plan.')
     limite_profesionales = forms.IntegerField(label='Límite de profesionales', required=False, min_value=1,
                                               help_text='Vacío = el del plan.')
+    dias_gracia = forms.IntegerField(label='Días de gracia', required=False, min_value=0, max_value=60,
+                                     help_text='Vacío = los del plan.')
     dictado_activo = forms.BooleanField(label='Dictado por voz activo', required=False)
 
     def clean_especialidades(self):
@@ -77,3 +79,10 @@ class RenovarForm(FormBase, forms.Form):
     monto_usd = forms.DecimalField(label='Monto cobrado (USD)', max_digits=9, decimal_places=2, initial=0)
     referencia = forms.CharField(label='Referencia de pago', max_length=100, required=False)
     notas = forms.CharField(label='Notas', max_length=200, required=False)
+
+
+class PlanForm(FormBase, forms.ModelForm):
+    class Meta:
+        model = Plan
+        fields = ['nombre', 'descripcion', 'precio_usd', 'precio_anual_usd', 'max_profesionales', 'max_usuarios',
+                  'dias_gracia', 'incluye_dictado', 'minutos_dictado_mes', 'activo']

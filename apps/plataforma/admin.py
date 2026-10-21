@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Especialidad, Plan, Suscripcion, Tenant
+from .models import AccesoSoporte, Especialidad, Plan, Suscripcion, Tenant
 
 
 class SuscripcionInline(admin.TabularInline):
@@ -27,3 +27,10 @@ class PlanAdmin(admin.ModelAdmin):
 class EspecialidadAdmin(admin.ModelAdmin):
     list_display = ['nombre', 'codigo', 'modulo', 'activa', 'orden']
     readonly_fields = ['codigo', 'modulo']
+
+
+@admin.register(AccesoSoporte)
+class AccesoSoporteAdmin(admin.ModelAdmin):
+    list_display = ['inicio', 'usuario', 'tenant', 'fin', 'motivo']
+    list_filter = ['tenant']
+    readonly_fields = ['usuario', 'tenant', 'inicio', 'fin', 'motivo']

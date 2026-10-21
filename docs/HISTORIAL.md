@@ -16,6 +16,11 @@
 
 ---
 
+### Panel de suscripciones (2026-10-21)
+- Hecho: planes en el panel, días de gracia (plan + consultorio), anular la última renovación con motivo, tablero de suscripciones, navegación del panel, registro de accesos de soporte (también en la auditoría del consultorio) y aviso de gracia al equipo.
+- Verificado: 128 tests (SQLite + PostgreSQL), ruff limpio, capturas del panel.
+- ADR: 033.
+
 ### Fase 12 — PWA offline de consulta (2026-10-20)
 - Hecho: app `offline` (idempotencia, ping, precarga), `offline.js` portado de Pediae (borradores, cola, píldora), service worker con copias de páginas y página «sin conexión» que lista lo guardado; consulta nueva en un solo envío (GET formulario / POST completa) que vincula la cita y genera el cargo; «Atender» sin red → consulta nueva guardada.
 - Verificado: 118 tests (SQLite + PostgreSQL), ruff limpio, E2E con servidor apagado (copia, cola, sincronización).

@@ -90,6 +90,9 @@
         <form method="post" action="{% url 'plataforma:salir' %}">{% csrf_token %}<button class="btn btn-sm btn-outline-primary">Salir al panel</button></form>
       </div>
     {% endif %}
+    {% if aviso_gracia is not None %}
+      <div class="alert alert-danger py-2"><i class="bi bi-exclamation-octagon me-1"></i>El servicio <b>venció el {{ tenant.activo_hasta|date:"d/m/Y" }}</b>. {% if aviso_gracia <= 1 %}<b>Hoy es el último día</b> de acceso{% else %}Quedan <b>{{ aviso_gracia }} días</b> de acceso{% endif %} antes del bloqueo. {% if membresia.rol == 'TITULAR' or membresia.rol == 'ADMIN' %}Renueva para que tu equipo no pierda el acceso.{% else %}Avisa al titular del consultorio.{% endif %}</div>
+    {% endif %}
     {% if aviso_vencimiento is not None %}
       <div class="alert alert-warning py-2"><i class="bi bi-calendar-x me-1"></i>{% if aviso_vencimiento <= 0 %}El servicio vence <b>hoy</b>.{% else %}El servicio vence en <b>{{ aviso_vencimiento }} día{{ aviso_vencimiento|pluralize }}</b> ({{ tenant.activo_hasta|date:"d/m/Y" }}).{% endif %} Renueva para que tu equipo no pierda el acceso.</div>
     {% endif %}

@@ -10,10 +10,11 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
+from apps.core.excepciones import ErrorDeNegocio
 from apps.core.fechas import sumar_meses
 from apps.core.permisos import Rol
 
-from .models import Suscripcion, Tenant
+from .models import AccesoSoporte, Suscripcion, Tenant
 
 # Primeros segmentos de URL que usa Omnis: no pueden ser enlaces de un tenant
 RESERVADOS = {
@@ -81,7 +82,7 @@ def crear_tenant(datos):
 @transaction.atomic
 def actualizar_tenant(tenant, datos):
     for campo in ('nombre', 'slug', 'plan', 'estado', 'activo_hasta', 'limite_usuarios', 'limite_profesionales',
-                  'notas'):
+                  'dias_gracia', 'notas'):
         if campo in datos:
             setattr(tenant, campo, datos[campo])
     tenant.save()
@@ -97,17 +98,103 @@ def actualizar_tenant(tenant, datos):
 
 
 @transaction.atomic
-def renovar(tenant, *, meses, monto_usd=0, referencia='', notas='', plan=None):
-    """Registra una renovación: extiende `activo_hasta` desde el vencimiento (o desde hoy si ya venció)."""
+def renovar(tenant, *, meses, monto_usd=0, referencia='', notas='', plan=None, usuario=None):
+    """
+    Registra una renovación: extiende `activo_hasta` desde el vencimiento. Si ya venció y está en días de gracia,
+    también sigue desde el vencimiento (los días de gracia no se regalan); si ya estaba bloqueado, desde hoy.
+    """
     hoy = timezone.localdate()
-    desde = tenant.activo_hasta + timedelta(days=1) if tenant.activo_hasta and tenant.activo_hasta >= hoy else hoy
+    if tenant.activo_hasta and (tenant.activo_hasta >= hoy or tenant.en_gracia):
+        desde = tenant.activo_hasta + timedelta(days=1)
+    else:
+        desde = hoy
     hasta = sumar_meses(desde, meses) - timedelta(days=1)
     plan = plan or tenant.plan
     Suscripcion.objects.create(tenant=tenant, plan=plan, desde=desde, hasta=hasta, monto_usd=monto_usd,
-                               referencia=referencia, notas=notas)
+                               referencia=referencia, notas=notas, hasta_anterior=tenant.activo_hasta,
+                               plan_anterior=tenant.plan, creado_por=usuario)
     tenant.activo_hasta = hasta
     tenant.plan = plan
     if tenant.estado != Tenant.Estado.ACTIVO:
         tenant.estado = Tenant.Estado.ACTIVO
     tenant.save(update_fields=['activo_hasta', 'plan', 'estado'])
     return tenant
+
+
+@transaction.atomic
+def anular_renovacion(suscripcion, *, motivo, usuario=None):
+    """
+    Anula una renovación mal cargada. Solo la última vigente del consultorio (las siguientes se calcularon
+    encadenadas desde ella): el vencimiento y el plan vuelven a como estaban antes de registrarla.
+    """
+    motivo = (motivo or '').strip()
+    if not motivo:
+        raise ErrorDeNegocio('Indica el motivo de la anulación.')
+    if suscripcion.anulada:
+        raise ErrorDeNegocio('Esa renovación ya está anulada.')
+    tenant = Tenant.objects.select_for_update().get(pk=suscripcion.tenant_id)
+    ultima = tenant.suscripciones.filter(anulada=False).order_by('-creado_en', '-pk').first()
+    if ultima is None or ultima.pk != suscripcion.pk:
+        raise ErrorDeNegocio('Solo se puede anular la última renovación vigente. Anula primero las más recientes.')
+    suscripcion.anulada = True
+    suscripcion.motivo_anulacion = motivo[:200]
+    suscripcion.anulada_por = usuario
+    suscripcion.anulada_en = timezone.now()
+    suscripcion.save(update_fields=['anulada', 'motivo_anulacion', 'anulada_por', 'anulada_en'])
+    tenant.activo_hasta = suscripcion.hasta_anterior          # None = no tenía vencimiento
+    tenant.plan = suscripcion.plan_anterior
+    tenant.save(update_fields=['activo_hasta', 'plan'])
+    return tenant
+
+
+def entrar_soporte(tenant, usuario, motivo=''):
+    """Abre un acceso de soporte y lo deja en la auditoría del consultorio (lo ve el titular)."""
+    from apps.core.models import Auditoria
+    from apps.core.tenancy import usando_tenant
+    acceso = AccesoSoporte.objects.create(usuario=usuario, tenant=tenant, motivo=(motivo or '')[:200])
+    detalle = 'Entrada de soporte de Omnis' + (f': {motivo}' if motivo else '')
+    with usando_tenant(tenant):
+        Auditoria.objects.create(usuario=usuario, accion=Auditoria.Accion.SOPORTE, objeto_tipo='plataforma.Tenant',
+                                 objeto_id=str(tenant.pk), detalle=detalle[:300])
+    return acceso
+
+
+def salir_soporte(acceso_id):
+    if acceso_id:
+        AccesoSoporte.objects.filter(pk=acceso_id, fin__isnull=True).update(fin=timezone.now())
+
+
+def tablero_suscripciones(hoy=None, meses=12):
+    """Cifras del panel: estado de los consultorios, vencimientos próximos, cobrado por mes y MRR estimado."""
+    from collections import OrderedDict
+    from decimal import Decimal
+
+    from django.db.models import Sum
+    from django.db.models.functions import TruncMonth
+    hoy = hoy or timezone.localdate()
+    tenants = list(Tenant.objects.select_related('plan').order_by('activo_hasta', 'nombre'))
+    por_estado = {'ACTIVO': [], 'GRACIA': [], 'VENCIDO': [], 'SUSPENDIDO': []}
+    for t in tenants:
+        por_estado[t.estado_servicio].append(t)
+    limite = hoy + timedelta(days=30)
+    vencen = [t for t in por_estado['ACTIVO'] if t.activo_hasta and t.activo_hasta <= limite]
+    mrr = sum((t.plan.precio_usd for t in por_estado['ACTIVO'] + por_estado['GRACIA'] if t.plan_id), Decimal('0'))
+
+    inicio = sumar_meses(hoy.replace(day=1), -(meses - 1))
+    filas = (Suscripcion.objects.filter(anulada=False, creado_en__date__gte=inicio)
+             .annotate(mes=TruncMonth('creado_en')).values('mes').annotate(total=Sum('monto_usd')))
+    totales = {(f['mes'].year, f['mes'].month): f['total'] or Decimal('0') for f in filas}
+    mensual = OrderedDict()
+    for i in range(meses):
+        m = sumar_meses(inicio, i)
+        mensual[(m.year, m.month)] = totales.get((m.year, m.month), Decimal('0'))
+    maximo = max(mensual.values(), default=0) or 1
+    nombres = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+    serie = [{'mes': nombres[mm - 1], 'titulo': f'{nombres[mm - 1]} {aa}', 'total': v,
+              'pct': round(float(v) / float(maximo) * 100, 1)} for (aa, mm), v in mensual.items()]
+    return {
+        'por_estado': por_estado, 'vencen': vencen, 'mrr': mrr, 'mensual': serie,
+        'cobrado_mes': mensual[(hoy.year, hoy.month)],
+        'cobrado_anio': sum((v for (aa, _), v in mensual.items() if aa == hoy.year), Decimal('0')),
+        'ultimas': Suscripcion.objects.select_related('tenant', 'plan', 'creado_por')[:15],
+    }

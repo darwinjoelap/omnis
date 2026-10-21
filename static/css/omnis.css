@@ -487,6 +487,8 @@ textarea.form-control { min-height: auto; }
 .om-columna-pista { flex: 1; width: 70%; max-width: 46px; display: flex; align-items: flex-end; }
 .om-columna-barra { width: 100%; min-height: 2px; background: var(--om-salvia-500); border-radius: 6px 6px 0 0; }
 .om-columna:hover .om-columna-barra { background: var(--om-petroleo-700); }
+.om-columnas-compactas { gap: .25rem; }
+.om-columnas-compactas .om-columna { flex-basis: 26px; }
 .om-columna-etiqueta { font-size: .72rem; color: var(--om-tinta-2); margin-top: .25rem; white-space: nowrap; }
 .om-barra-pista { border-radius: 4px; }
 .om-barra { border-radius: 4px; background: var(--om-salvia-500); }

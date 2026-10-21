@@ -12,4 +12,9 @@ urlpatterns = [
     path('<int:pk>/entrar/', views.entrar, name='entrar'),
     path('salir/', views.salir, name='salir'),
     path('tasas/', views.tasas, name='tasas'),
+    path('suscripciones/', views.suscripciones, name='suscripciones'),
+    path('renovaciones/<int:pk>/anular/', views.anular_renovacion, name='anular_renovacion'),
+    path('planes/', views.planes, name='planes'),
+    path('planes/nuevo/', views.plan_form, name='plan_nuevo'),
+    path('planes/<int:pk>/', views.plan_form, name='plan_editar'),
 ]

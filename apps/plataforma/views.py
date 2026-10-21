@@ -11,12 +11,15 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from apps.core.excepciones import ErrorDeNegocio
 from apps.core.middleware import SESION_SOPORTE, SESION_TENANT
 from apps.core.numeros import numero
 
 from . import servicios
-from .forms import EditarTenantForm, NuevoTenantForm, RenovarForm
-from .models import Tenant
+from .forms import EditarTenantForm, NuevoTenantForm, PlanForm, RenovarForm
+from .models import Plan, Suscripcion, Tenant
+
+SESION_ACCESO = 'omnis_soporte_acceso'
 
 log = logging.getLogger('apps.plataforma')
 
@@ -66,7 +69,8 @@ def editar(request, pk):
     tenant = get_object_or_404(Tenant.objects.select_related('configuracion', 'plan'), pk=pk)
     inicial = {'nombre': tenant.nombre, 'slug': tenant.slug, 'plan': tenant.plan, 'estado': tenant.estado,
                'activo_hasta': tenant.activo_hasta, 'limite_usuarios': tenant.limite_usuarios,
-               'limite_profesionales': tenant.limite_profesionales, 'notas': tenant.notas,
+               'limite_profesionales': tenant.limite_profesionales, 'dias_gracia': tenant.dias_gracia,
+               'notas': tenant.notas,
                'especialidades': list(tenant.especialidades.all()),
                'dictado_activo': tenant.configuracion.dictado_activo}
     form = EditarTenantForm(request.POST or None, initial=inicial, tenant=tenant)
@@ -79,7 +83,9 @@ def editar(request, pk):
                 .select_related('usuario', 'perfil', 'perfil__especialidad').order_by('-activa', 'rol'))
     return render(request, 'plataforma/form.html', {
         'titulo': tenant.nombre, 'form': form, 'tenant_obj': tenant, 'miembros': miembros,
-        'renovaciones': tenant.suscripciones.select_related('plan')[:12],
+        'renovaciones': tenant.suscripciones.select_related('plan', 'creado_por', 'anulada_por')[:12],
+        'ultima_renovacion': tenant.suscripciones.filter(anulada=False).order_by('-creado_en', '-pk').first(),
+        'accesos': tenant.accesos_soporte.select_related('usuario')[:8],
         'form_renovar': RenovarForm(initial={'plan': tenant.plan}), 'enlace': _enlace(request, tenant)})
 
 
@@ -91,7 +97,7 @@ def renovar(request, pk):
     if form.is_valid():
         d = form.cleaned_data
         servicios.renovar(tenant, meses=d['meses'], monto_usd=d['monto_usd'], referencia=d['referencia'],
-                          notas=d['notas'], plan=d['plan'])
+                          notas=d['notas'], plan=d['plan'], usuario=request.user)
         messages.success(request, f'{tenant.nombre}: activo hasta el {tenant.activo_hasta:%d/%m/%Y}.')
     else:
         messages.error(request, 'Revisa los datos de la renovación.')
@@ -103,18 +109,65 @@ def renovar(request, pk):
 def entrar(request, pk):
     """El superusuario entra al tenant como Soporte (permisos de Titular, sin ver historias clínicas)."""
     tenant = get_object_or_404(Tenant, pk=pk)
+    servicios.salir_soporte(request.session.get(SESION_ACCESO))       # cambia de consultorio sin "salir"
+    acceso = servicios.entrar_soporte(tenant, request.user, request.POST.get('motivo', ''))
     request.session[SESION_SOPORTE] = tenant.pk
+    request.session[SESION_ACCESO] = acceso.pk
     request.session.pop(SESION_TENANT, None)
     log.warning('Soporte: %s entró al tenant %s (%s)', request.user.username, tenant.nombre, tenant.pk)
+    if not tenant.esta_activo:
+        messages.warning(request, f'{tenant.nombre} está {tenant.estado_servicio.lower()}: su equipo no puede entrar, '
+                                  'pero soporte sí.')
     return redirect('core:inicio')
 
 
 @solo_plataforma
 @require_POST
 def salir(request):
+    servicios.salir_soporte(request.session.pop(SESION_ACCESO, None))
     request.session.pop(SESION_SOPORTE, None)
     request.session.pop(SESION_TENANT, None)
     return redirect('plataforma:lista')
+
+
+@solo_plataforma
+@require_POST
+def anular_renovacion(request, pk):
+    suscripcion = get_object_or_404(Suscripcion.objects.select_related('tenant'), pk=pk)
+    try:
+        servicios.anular_renovacion(suscripcion, motivo=request.POST.get('motivo', ''), usuario=request.user)
+        t = Tenant.objects.get(pk=suscripcion.tenant_id)
+        vence = f'vence el {t.activo_hasta:%d/%m/%Y}' if t.activo_hasta else 'sin vencimiento'
+        messages.success(request, f'Renovación anulada. {t.nombre} {vence}.')
+        log.warning('Plataforma: %s anuló la renovación %s de %s', request.user.username, pk, t.nombre)
+    except ErrorDeNegocio as e:
+        messages.error(request, str(e))
+    return redirect('plataforma:editar', pk=suscripcion.tenant_id)
+
+
+@solo_plataforma
+def suscripciones(request):
+    datos = servicios.tablero_suscripciones()
+    return render(request, 'plataforma/suscripciones.html', {'titulo': 'Suscripciones', **datos})
+
+
+@solo_plataforma
+def planes(request):
+    lista = Plan.objects.annotate(n_tenants=Count('tenants')).order_by('-activo', 'precio_usd', 'nombre')
+    return render(request, 'plataforma/planes.html', {'titulo': 'Planes', 'planes': lista})
+
+
+@solo_plataforma
+def plan_form(request, pk=None):
+    plan = get_object_or_404(Plan, pk=pk) if pk else None
+    form = PlanForm(request.POST or None, instance=plan)
+    if request.method == 'POST' and form.is_valid():
+        plan = form.save()
+        messages.success(request, f'Plan «{plan.nombre}» guardado.')
+        return redirect('plataforma:planes')
+    return render(request, 'plataforma/plan_form.html', {
+        'titulo': plan.nombre if plan else 'Nuevo plan', 'form': form, 'plan': plan,
+        'n_tenants': plan.tenants.count() if plan else 0})
 
 
 @solo_plataforma

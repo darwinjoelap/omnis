@@ -1,0 +1,9 @@
+{# Navegación del panel de plataforma #}
+{% with n=request.resolver_match.url_name %}
+<nav class="d-flex flex-wrap gap-2 mb-3" aria-label="Panel de plataforma">
+  <a href="{% url 'plataforma:lista' %}" class="btn btn-sm {% if n == 'lista' or n == 'editar' or n == 'nuevo' %}btn-primary{% else %}btn-outline-secondary{% endif %}"><i class="bi bi-buildings me-1"></i>Consultorios</a>
+  <a href="{% url 'plataforma:suscripciones' %}" class="btn btn-sm {% if n == 'suscripciones' %}btn-primary{% else %}btn-outline-secondary{% endif %}"><i class="bi bi-graph-up me-1"></i>Suscripciones</a>
+  <a href="{% url 'plataforma:planes' %}" class="btn btn-sm {% if n == 'planes' or n == 'plan_nuevo' or n == 'plan_editar' %}btn-primary{% else %}btn-outline-secondary{% endif %}"><i class="bi bi-layers me-1"></i>Planes</a>
+  <a href="{% url 'plataforma:tasas' %}" class="btn btn-sm {% if n == 'tasas' %}btn-primary{% else %}btn-outline-secondary{% endif %}"><i class="bi bi-currency-exchange me-1"></i>Tasa BCV</a>
+</nav>
+{% endwith %}

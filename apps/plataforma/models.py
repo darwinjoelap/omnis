@@ -1,6 +1,9 @@
 """
 Plataforma (sin tenant): consultorios/clínicas cliente, planes, renovaciones y catálogo de especialidades.
 """
+from datetime import timedelta
+
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 from django.utils.text import slugify
@@ -16,7 +19,11 @@ class Plan(models.Model):
                                                     help_text='Vacío = sin límite.')
     incluye_dictado = models.BooleanField('Incluye dictado por voz', default=False)
     minutos_dictado_mes = models.PositiveIntegerField('Minutos de dictado al mes', default=0)
-    activo = models.BooleanField('Activo', default=True)
+    dias_gracia = models.PositiveSmallIntegerField(
+        'Días de gracia', default=3,
+        help_text='Días después del vencimiento en que el consultorio sigue entrando (con aviso) antes del bloqueo.')
+    descripcion = models.CharField('Descripción', max_length=200, blank=True)
+    activo = models.BooleanField('Activo', default=True, help_text='Inactivo = no se ofrece a consultorios nuevos.')
 
     class Meta:
         verbose_name = 'Plan'
@@ -64,6 +71,8 @@ class Tenant(models.Model):
                                                        help_text='Vacío = el del plan.')
     limite_profesionales = models.PositiveSmallIntegerField('Límite de profesionales', null=True, blank=True,
                                                             help_text='Vacío = el del plan.')
+    dias_gracia = models.PositiveSmallIntegerField('Días de gracia', null=True, blank=True,
+                                                   help_text='Vacío = los del plan.')
     especialidades = models.ManyToManyField(Especialidad, blank=True, related_name='tenants',
                                             verbose_name='Especialidades habilitadas')
     notas = models.TextField('Notas internas (solo plataforma)', blank=True)
@@ -93,10 +102,42 @@ class Tenant(models.Model):
         return (self.activo_hasta - timezone.localdate()).days
 
     @property
+    def gracia(self):
+        """Días de gracia que aplican: los propios, si no los del plan; sin plan, ninguno."""
+        if self.dias_gracia is not None:
+            return self.dias_gracia
+        return self.plan.dias_gracia if self.plan_id else 0
+
+    @property
+    def bloqueo_el(self):
+        """Primer día sin acceso (vencimiento + gracia + 1). None = sin vencimiento."""
+        return self.activo_hasta + timedelta(days=self.gracia + 1) if self.activo_hasta else None
+
+    @property
+    def en_gracia(self):
+        hoy = timezone.localdate()
+        return (self.estado == self.Estado.ACTIVO and self.activo_hasta is not None
+                and self.activo_hasta < hoy < self.bloqueo_el)
+
+    @property
+    def dias_de_gracia_restantes(self):
+        return (self.bloqueo_el - timezone.localdate()).days if self.en_gracia else None
+
+    @property
     def esta_activo(self):
+        """Puede entrar: estado activo y sin vencer (o dentro de los días de gracia)."""
         if self.estado != self.Estado.ACTIVO:
             return False
-        return not (self.activo_hasta and self.activo_hasta < timezone.localdate())
+        return not (self.activo_hasta and timezone.localdate() >= self.bloqueo_el)
+
+    @property
+    def estado_servicio(self):
+        """ACTIVO · GRACIA · VENCIDO · SUSPENDIDO (para listas y tableros)."""
+        if self.estado != self.Estado.ACTIVO:
+            return 'SUSPENDIDO'
+        if self.en_gracia:
+            return 'GRACIA'
+        return 'ACTIVO' if self.esta_activo else 'VENCIDO'
 
     @property
     def max_usuarios(self):
@@ -120,12 +161,39 @@ class Suscripcion(models.Model):
     monto_usd = models.DecimalField('Monto (USD)', max_digits=9, decimal_places=2, default=0)
     referencia = models.CharField('Referencia de pago', max_length=100, blank=True)
     notas = models.CharField('Notas', max_length=200, blank=True)
+    # Cómo estaba el consultorio antes de esta renovación (para poder anularla)
+    hasta_anterior = models.DateField('Vencía antes', null=True, blank=True)
+    plan_anterior = models.ForeignKey(Plan, on_delete=models.PROTECT, null=True, blank=True, related_name='+')
+    creado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+                                   related_name='+')
+    anulada = models.BooleanField('Anulada', default=False)
+    motivo_anulacion = models.CharField('Motivo de la anulación', max_length=200, blank=True)
+    anulada_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+                                    related_name='+')
+    anulada_en = models.DateTimeField(null=True, blank=True)
     creado_en = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         verbose_name = 'Renovación'
         verbose_name_plural = 'Renovaciones'
-        ordering = ['-hasta']
+        ordering = ['-creado_en']
 
     def __str__(self):
         return f'{self.tenant} · {self.desde:%d/%m/%Y} → {self.hasta:%d/%m/%Y}'
+
+
+class AccesoSoporte(models.Model):
+    """Cada vez que un administrador de Omnis entra a un consultorio como soporte (trazabilidad)."""
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='+')
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='accesos_soporte')
+    inicio = models.DateTimeField(auto_now_add=True)
+    fin = models.DateTimeField(null=True, blank=True)
+    motivo = models.CharField('Motivo', max_length=200, blank=True)
+
+    class Meta:
+        verbose_name = 'Acceso de soporte'
+        verbose_name_plural = 'Accesos de soporte'
+        ordering = ['-inicio']
+
+    def __str__(self):
+        return f'{self.usuario} → {self.tenant} · {self.inicio:%d/%m/%Y %H:%M}'

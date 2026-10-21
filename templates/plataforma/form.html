@@ -1,9 +1,11 @@
 {% extends 'base.html' %}
 {% block contenido %}
-<a href="{% url 'plataforma:lista' %}" class="small text-decoration-none"><i class="bi bi-arrow-left"></i> Consultorios</a>
+{% include 'plataforma/_nav.html' %}
 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mt-2 mb-3">
-  <h1 class="h3 mb-0">{{ titulo }}</h1>
-  {% if tenant_obj %}<form method="post" action="{% url 'plataforma:entrar' tenant_obj.pk %}">{% csrf_token %}<button class="btn btn-sm btn-primary"><i class="bi bi-box-arrow-in-right me-1"></i>Entrar como soporte</button></form>{% endif %}
+  <h1 class="h3 mb-0">{{ titulo }} {% if tenant_obj %}{% with t=tenant_obj %}<span class="fs-6 align-middle">{% include 'plataforma/_estado.html' %}</span>{% endwith %}{% endif %}</h1>
+  {% if tenant_obj %}<form method="post" action="{% url 'plataforma:entrar' tenant_obj.pk %}" class="d-flex gap-2">{% csrf_token %}
+    <input type="text" name="motivo" class="form-control form-control-sm" placeholder="Motivo (opcional)" maxlength="200" style="max-width:220px">
+    <button class="btn btn-sm btn-primary text-nowrap"><i class="bi bi-headset me-1"></i>Entrar como soporte</button></form>{% endif %}
   {% if enlace %}<div class="small w-100">Enlace: <a href="{{ enlace }}" target="_blank">{{ enlace }}</a>
     <button type="button" class="btn btn-sm btn-link p-0 ms-1" onclick="navigator.clipboard.writeText('{{ enlace|escapejs }}').then(()=>{this.textContent='copiado'})" title="Copiar"><i class="bi bi-clipboard"></i></button></div>{% endif %}
 </div>
@@ -23,6 +25,7 @@
         {% if form.estado %}<div class="col-md-4">{% include 'partials/campo.html' with campo=form.estado %}</div>
         <div class="col-md-4">{% include 'partials/campo.html' with campo=form.limite_usuarios %}</div>
         <div class="col-md-4">{% include 'partials/campo.html' with campo=form.limite_profesionales %}</div>
+        <div class="col-md-4">{% include 'partials/campo.html' with campo=form.dias_gracia %}</div>
         <div class="col-md-4 pt-md-4">{% include 'partials/campo.html' with campo=form.dictado_activo %}</div>{% endif %}
         <div class="col-12">{% include 'partials/campo.html' with campo=form.notas %}</div>
       </div>
@@ -59,15 +62,28 @@
         </div>
         <button class="btn btn-sm btn-success mt-2"><i class="bi bi-calendar-plus me-1"></i>Registrar renovación</button>
       </form>
+      {% if tenant_obj.activo_hasta %}<div class="px-3 pb-2 small text-muted">Vence el <b>{{ tenant_obj.activo_hasta|date:"d/m/Y" }}</b> · {{ tenant_obj.gracia }} día{{ tenant_obj.gracia|pluralize }} de gracia · bloqueo el {{ tenant_obj.bloqueo_el|date:"d/m/Y" }}</div>{% endif %}
       {% if renovaciones %}<ul class="list-group list-group-flush small">{% for r in renovaciones %}
-        <li class="list-group-item d-flex justify-content-between"><span>{{ r.desde|date:"d/m/Y" }} → {{ r.hasta|date:"d/m/Y" }}</span><span>{{ r.monto_usd|usd }}</span></li>{% endfor %}</ul>{% endif %}
+        <li class="list-group-item {% if r.anulada %}text-muted{% endif %}">
+          <div class="d-flex justify-content-between gap-2"><span class="{% if r.anulada %}text-decoration-line-through{% endif %}">{{ r.desde|date:"d/m/Y" }} → {{ r.hasta|date:"d/m/Y" }}</span><span class="fw-semibold {% if r.anulada %}text-decoration-line-through{% endif %}">{{ r.monto_usd|usd }}</span></div>
+          <div class="text-muted">{{ r.plan|default:"Sin plan" }}{% if r.referencia %} · ref. {{ r.referencia }}{% endif %} · {{ r.creado_en|date:"d/m/Y" }}{% if r.creado_por %} · {{ r.creado_por.username }}{% endif %}</div>
+          {% if r.anulada %}<div class="text-danger">Anulada{% if r.anulada_por %} por {{ r.anulada_por.username }}{% endif %}: {{ r.motivo_anulacion }}</div>
+          {% elif ultima_renovacion and r.pk == ultima_renovacion.pk %}
+          <form method="post" action="{% url 'plataforma:anular_renovacion' r.pk %}" class="mt-1" onsubmit="const m = prompt('Motivo de la anulación (el vencimiento vuelve a como estaba antes de esta renovación)'); if (!m) return false; this.motivo.value = m;">{% csrf_token %}
+            <input type="hidden" name="motivo"><button class="btn btn-link btn-sm p-0 text-danger">Anular esta renovación</button></form>{% endif %}
+        </li>{% endfor %}</ul>{% endif %}
     </div>
     <div class="card"><div class="card-header bg-white fw-semibold">Equipo ({{ miembros|length }})</div>
       <ul class="list-group list-group-flush">{% for m in miembros %}
         <li class="list-group-item small d-flex justify-content-between {% if not m.activa %}text-muted{% endif %}"><span>{{ m.usuario.nombre_visible }}<br><span class="text-muted">{{ m.usuario.username }}{% if m.perfil_activo %} · {{ m.perfil_activo.especialidad }}{% endif %}</span></span><span>{{ m.get_rol_display }}{% if not m.activa %} · inactivo{% endif %}</span></li>
       {% empty %}<li class="list-group-item small text-muted">Sin miembros.</li>{% endfor %}</ul>
     </div>
-    <p class="small text-muted mt-2">Estado <b>Suspendido</b> o fecha vencida bloquean el acceso de todo el equipo sin borrar datos.</p>
+    <div class="card mt-3"><div class="card-header bg-white fw-semibold">Accesos de soporte</div>
+      <ul class="list-group list-group-flush small">{% for a in accesos %}
+        <li class="list-group-item"><div class="d-flex justify-content-between"><span>{{ a.usuario.username|default:"—" }}</span><span class="text-muted">{{ a.inicio|date:"d/m/Y g:i a" }}{% if a.fin %} – {{ a.fin|date:"g:i a" }}{% endif %}</span></div>{% if a.motivo %}<div class="text-muted">{{ a.motivo }}</div>{% endif %}</li>
+      {% empty %}<li class="list-group-item text-muted">Sin accesos registrados.</li>{% endfor %}</ul>
+    </div>
+    <p class="small text-muted mt-2">Estado <b>Suspendido</b> o vencimiento + días de gracia bloquean el acceso de todo el equipo sin borrar datos. Soporte entra siempre; cada entrada queda registrada aquí y en la auditoría del consultorio.</p>
   </div>
   {% endif %}
 </div>

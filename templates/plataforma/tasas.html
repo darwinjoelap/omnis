@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% block contenido %}
-<a href="{% url 'plataforma:lista' %}" class="small text-decoration-none"><i class="bi bi-arrow-left"></i> Consultorios</a>
+{% include 'plataforma/_nav.html' %}
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-2 mb-3">
   <div><h1 class="h3 mb-0">Tasa BCV</h1><div class="small text-muted">Única para todos los consultorios (cada uno puede cargar la suya si el BCV falla). El cron la consulta a diario a las 7:00 a. m.</div></div>
   {% if vigente %}<div class="text-end"><div class="small text-muted">Vigente</div><div class="fs-5 fw-bold {% if vigente.fecha != hoy %}text-warning-emphasis{% endif %}">Bs {{ vigente.bs_por_usd|floatformat:"4g" }}</div><div class="small text-muted">{{ vigente.fecha|date:"d/m/Y" }}</div></div>{% endif %}

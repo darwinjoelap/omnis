@@ -1,0 +1,2 @@
+{# Insignia del estado del servicio de un consultorio (t) #}
+{% with e=t.estado_servicio %}{% if e == 'ACTIVO' %}<span class="badge text-bg-success">Activo</span>{% elif e == 'GRACIA' %}<span class="badge text-bg-warning" title="Vencido: entra por días de gracia">En gracia · {{ t.dias_de_gracia_restantes }} d</span>{% elif e == 'SUSPENDIDO' %}<span class="badge text-bg-danger">Suspendido</span>{% else %}<span class="badge text-bg-secondary">Vencido</span>{% endif %}{% endwith %}

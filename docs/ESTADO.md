@@ -3,9 +3,10 @@
 > Se actualiza al **cerrar cada sesión** y es lo primero que se lee al abrir la siguiente.
 > Menos de 100 líneas: el detalle de fases cerradas va a `HISTORIAL.md`; las decisiones, a `DECISIONES.md`.
 
-**Última actualización:** 2026-10-20
-**Fase actual:** 12 cerrada en código → siguiente **13/14 módulo de especialidad** (Pediatría o Ginecología) o Railway staging
+**Última actualización:** 2026-10-21
+**Fase actual:** 12 cerrada + panel de suscripciones (ADR-033) → siguiente **13/14 módulo de especialidad** (Pediatría o Ginecología) o Railway staging
 **Repositorio:** `github.com/darwinjoelap/omnis` (privado), rama `main` — código en `C:\proyectos\omnis`
+**Último commit:** `5d230b8` Fase 12 (pusheado 2026-10-20) · entorno local: `venv\Scripts\Activate.ps1` (carpeta `venv`, no `.venv`)
 **Staging / producción:** pendientes (Railway no creado)
 
 ---
@@ -23,15 +24,16 @@
 - [x] 10 Documentos PDF: récipe (2 columnas), informe, referencia, reposo, constancia, recibo
 - [x] 11 Reportes: tablero con filtros, morbilidad CIE-10, agenda, ingresos, por profesional; PDF y Excel (ADR-031)
 - [x] 12 PWA offline de consulta: borradores, cola con idempotencia, precarga y copias de agenda/fichas, consulta nueva sin red (ADR-032)
+- [x] Panel de suscripciones: planes, días de gracia, anular renovación, tablero, registro de accesos de soporte (ADR-033)
 - [x] Perfil del médico estilo Pediae: logo/marca de agua, banner, firma y sello fijos al pie (ADR-030)
 - [x] Alcance de pacientes por rol (ADR-029): médico ve los suyos; asistente/titular ven todo; configurable
 - [x] Marca **Omnis** (ADR-028): logo, paleta, fuentes locales, login en dos paneles, inicio con cifras del día
 
-**Verificación:** 118 tests en verde en SQLite y PostgreSQL 16 · `ruff` limpio · `makemigrations --check` limpio ·
+**Verificación:** 128 tests en verde en SQLite y PostgreSQL 16 · `ruff` limpio · `makemigrations --check` limpio ·
 E2E con navegador: paciente → consulta → cierre → PDF; offline (servidor apagado): copia de agenda, consulta nueva en cola, sincroniza al volver.
 
 ## Pendiente inmediato
-1. Darwin: Python 3.14.3 confirmado — crear venv con Python 3.14 (`py -3.14 --version`), `pip install -r requirements-dev.txt`, `migrate`, `test`.
+1. ~~venv + migrate + test en Windows~~ hecho: 118 tests OK en la PC de Darwin, migración `offline.0001` aplicada (2026-10-20).
 2. Darwin: prueba manual con `crear_tenant` (ver README) — revisar textos de reposo/constancia y el récipe impreso.
 3. Crear proyecto Railway (Postgres, servicio web, servicio cron) → staging.
 4. Darwin: probar offline en el teléfono (abrir la agenda con señal, modo avión, atender, volver a la señal).
@@ -48,6 +50,9 @@ E2E con navegador: paciente → consulta → cierre → PDF; offline (servidor a
 - Offline: cada dispositivo debe abrir Omnis con señal al menos una vez (y la sesión debe seguir abierta); sin red no se crean pacientes nuevos, ni cobros, documentos/PDF o adjuntos; las filas dinámicas (diagnósticos, récipe) de un borrador se recuperan solo si ya existían en la página.
 - Sin módulos de especialidad reales (Pediatría/Ginecología): solo Medicina General + básicas.
 
+- Suscripciones: sin aviso por correo antes de vencer (solo dentro de la app); sin descuentos ni prueba gratuita; el ingreso mensual estimado usa el precio de lista del plan.
+- Railway con problemas (2026-10-21): se avanza en lo que no depende del despliegue.
+
 ## Preguntas abiertas
 - [ ] ¿Qué especialidad lleva el primer médico real a producción (13 ó 14)?
 - [ ] ¿Migrar tenants de Ginea/Pediae (Fase 18)?
@@ -59,5 +64,6 @@ E2E con navegador: paciente → consulta → cierre → PDF; offline (servidor a
 Ninguno.
 
 ## Notas
+- Próxima sesión: empezar por la prueba offline en el teléfono (punto 4) y decidir especialidad (13 ó 14) o Railway staging.
 - Proyectos de referencia en `C:\proyectos\{ordo,pediae,ginea-saas,biolife}` — **no se tocan** desde aquí.
 - Tests en Postgres: `DATABASE_URL=postgres://… python manage.py test`.
